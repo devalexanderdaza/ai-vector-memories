@@ -570,6 +570,17 @@ export class MemoryDatabase {
       );
 
       this.db.exec('COMMIT');
+
+      // --- Trigger RuVector insert asynchronously ---
+      try {
+        const ruvector = (await import('../memory/ruvector-service.js')).RuVectorService.getInstance();
+        // Fire-and-forget vectorization to avoid blocking memory creation
+        ruvector.insertMemory(memory.id, summary, features.projectScope).catch(e => log(String(e)));
+      } catch (err) {
+         log(`Failed to trigger RuVector insert: ${err}`);
+      }
+      // -----------------------------------------
+
       return memory;
     } catch (error) {
       this.db.exec('ROLLBACK');
@@ -656,6 +667,27 @@ export class MemoryDatabase {
         .sort((a, b) => b.strength - a.strength)
         .slice(0, limit);
     }
+
+    // --- Attempt Ultra-Fast Search with RuVector ---
+    try {
+      const ruvector = (await import('../memory/ruvector-service.js')).RuVectorService.getInstance();
+      const ruvectorIds = await ruvector.searchMemories(queryText, currentProject, limit);
+
+      if (ruvectorIds.length > 0) {
+        log(`[RuVector] Found ${ruvectorIds.length} memories in O(log N)`);
+        
+        // Fetch full information from SQLite using the IDs
+        const placeholders = ruvectorIds.map(() => '?').join(',');
+        const rows = this.db.prepare(`SELECT * FROM memory_units WHERE id IN (${placeholders}) AND status = 'active'`).all(...ruvectorIds) as any[];
+        
+        // Preserve the relevance order provided by RuVector
+        const memoriesMap = new Map(rows.map(r => [r.id, this.rowToMemoryUnit(r)]));
+        return ruvectorIds.map(id => memoriesMap.get(id)).filter(Boolean) as MemoryUnit[];
+      }
+    } catch (err) {
+      log(`[RuVector] Fast search failed, falling back to linear scan: ${err}`);
+    }
+    // -------------------------------------------------------------
 
     // Fetch all active memories for the current scope (same logic as getMemoriesByScope)
     const query = `

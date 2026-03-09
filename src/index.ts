@@ -1,5 +1,5 @@
 /**
- * True-Mem - Persistent memory plugin for OpenCode
+ * AI Vector Memories - Persistent memory plugin for OpenCode
  *
  * CRITICAL:
  * - Initialize immediately but DON'T await in default export
@@ -15,6 +15,7 @@ import { getVersion } from './utils/version.js';
 import { showToast } from './utils/toast.js';
 import { EmbeddingService } from './memory/embeddings-nlp.js';
 import { getEmbeddingsEnabled } from './config/state.js';
+import { RuVectorService } from './memory/ruvector-service.js';
 
 // Singleton state - shared across all hook calls
 let state: {
@@ -44,7 +45,7 @@ const TrueMemory: Plugin = async (ctx) => {
     hasShownToast = true;
     const version = getVersion();
     setTimeout(() => {
-      showToast(ctx, `True-Mem v${version}`, 'Memory active.', 'info', 4000);
+      showToast(ctx, `AI Vector Memories v${version}`, 'Memory active.', 'info', 4000);
     }, 2000);
   }
 
@@ -95,6 +96,10 @@ const TrueMemory: Plugin = async (ctx) => {
           const initialized = await embeddingService.initialize();
           if (initialized) {
             log('NLP embeddings enabled');
+
+            // --- Initialize RuVector ---
+            const ruVector = RuVectorService.getInstance();
+            await ruVector.initialize();
           } else {
             log('NLP embeddings failed to initialize, using Jaccard only');
           }
@@ -115,7 +120,7 @@ const TrueMemory: Plugin = async (ctx) => {
   }
 
   // Return hooks IMMEDIATELY - no await!
-  log('True-Mem: Plugin registered (immediate init mode)');
+  log('AI Vector Memories: Plugin registered (immediate init mode)');
 
   return {
     config: async (input) => {

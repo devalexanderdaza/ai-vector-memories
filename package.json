@@ -67,6 +67,7 @@
     "@huggingface/transformers": "^4.0.0-next.1",
     "@opencode-ai/plugin": "^1.2.6",
     "@opencode-ai/sdk": "^1.2.6",
+    "ruvector": "^0.2.11",
     "uuid": "^13.0.0"
   },
   "devDependencies": {

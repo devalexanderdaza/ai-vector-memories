@@ -12,7 +12,13 @@ dist/
 # Source maps (keep in dist only)
 !src/**/*.js
 
-# IDE
+# IDEs
+.agent/
+.cursor/
+.trae/
+.windsurf/
+.github/skills/
+.claude/
 .idea/
 .vscode/
 *.swp
@@ -73,3 +79,7 @@ REVIEW.md
 
 # Development plans (personal)
 plans/
+
+# BMAD (not for repo)
+#_bmad-*/
+#_bmad/

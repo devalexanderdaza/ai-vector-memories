@@ -67,14 +67,14 @@ What makes **AI Vector Memories for OpenCode** different from a simple database?
 
 ## Key Features
 
-| Feature | Description |
-|---------|-------------|
-| **Dual-Scope Memory** | Global (follows you across projects) + Project-specific |
-| **Non-Blocking** | Async extraction, no UI freezes or QUEUED states |
-| **Multilingual** | Full support for Italian, Spanish, French, German, and 11 more languages |
-| **Smart Decay** | Only episodic memories fade; preferences and decisions stay forever |
-| **Zero Native Dependencies** | Works on Bun and Node 22+ with built-in SQLite |
-| **Multilingual** | Full support for Italian, Spanish, French, German, and 11 more languages |
+| Feature                      | Description                                                              |
+| ---------------------------- | ------------------------------------------------------------------------ |
+| **Dual-Scope Memory**        | Global (follows you across projects) + Project-specific                  |
+| **Non-Blocking**             | Async extraction, no UI freezes or QUEUED states                         |
+| **Multilingual**             | Full support for Italian, Spanish, French, German, and 11 more languages |
+| **Smart Decay**              | Only episodic memories fade; preferences and decisions stay forever      |
+| **Zero Native Dependencies** | Works on Bun and Node 22+ with built-in SQLite                           |
+| **Multilingual**             | Full support for Italian, Spanish, French, German, and 11 more languages |
 
 ---
 
@@ -84,22 +84,22 @@ What truly sets **AI Vector Memories for OpenCode** apart is its ability to dist
 
 **What gets filtered OUT:**
 
-| Pattern Type | Example | Why filtered |
-|--------------|---------|--------------|
-| Questions | "Do you remember this?" | It's a question, not a statement |
-| 1st person recall | "I remember when we fixed that" | Recounting, not requesting storage |
-| Remind-me recall | "Remind me how we did this" | Asking AI to recall info, not store |
-| AI meta-talk | "Goal: The user is trying to..." | AI-generated, not user content |
-| List selections | "I prefer option 3" | Context-specific choice, not general preference |
+| Pattern Type      | Example                          | Why filtered                                    |
+| ----------------- | -------------------------------- | ----------------------------------------------- |
+| Questions         | "Do you remember this?"          | It's a question, not a statement                |
+| 1st person recall | "I remember when we fixed that"  | Recounting, not requesting storage              |
+| Remind-me recall  | "Remind me how we did this"      | Asking AI to recall info, not store             |
+| AI meta-talk      | "Goal: The user is trying to..." | AI-generated, not user content                  |
+| List selections   | "I prefer option 3"              | Context-specific choice, not general preference |
 
 **What gets stored:**
 
-| Pattern Type | Example | Why stored |
-|--------------|---------|------------|
-| Imperatives | "Remember this: always run tests" | Explicit storage request |
-| Preferences | "I prefer TypeScript over JavaScript" | General, reusable preference |
-| Decisions | "We decided to use SQLite" | Project-level decision |
-| Constraints | "Never use var keyword" | Permanent rule |
+| Pattern Type | Example                               | Why stored                   |
+| ------------ | ------------------------------------- | ---------------------------- |
+| Imperatives  | "Remember this: always run tests"     | Explicit storage request     |
+| Preferences  | "I prefer TypeScript over JavaScript" | General, reusable preference |
+| Decisions    | "We decided to use SQLite"            | Project-level decision       |
+| Constraints  | "Never use var keyword"               | Permanent rule               |
 
 All filtering patterns support **10 languages**: English, Italian, Spanish, French, German, Portuguese, Dutch, Polish, Turkish, and Russian.
 
@@ -111,9 +111,7 @@ Add to your `~/.config/opencode/opencode.jsonc`:
 
 ```jsonc
 {
-  "plugin": [
-    "ai-vector-memories"
-  ]
+  "plugin": ["ai-vector-memories"],
 }
 ```
 
@@ -140,28 +138,29 @@ AI Vector Memories for OpenCode creates a configuration file at `~/.ai-vector-me
 {
   // Injection mode: 0 = session start only, 1 = every prompt (default, real-time updates)
   "injectionMode": 1,
-  
+
   // Sub-agent mode: 0 = disabled, 1 = enabled (default)
   "subagentMode": 1,
-  
+
   // Embeddings: 0 = Jaccard similarity only, 1 = hybrid (Jaccard + embeddings)
   "embeddingsEnabled": 0,
-  
+
   // Maximum memories to inject per prompt (10-50 recommended)
-  "maxMemories": 20
+  "maxMemories": 20,
 }
 ```
 
 ### Settings Explained
 
-| Setting | Values | Description |
-|---------|--------|-------------|
-| **injectionMode** | `0` or `1` | `0` = inject at session start only (~76% token savings). `1` = inject on every prompt (default, real-time updates) |
-| **subagentMode** | `0` or `1` | `0` = disable memory injection for sub-agents. `1` = enable for sub-agents (default) |
-| **embeddingsEnabled** | `0` or `1` | `0` = use Jaccard similarity only (fast, default). `1` = use hybrid semantic embeddings (experimental) |
-| **maxMemories** | `10-50` | How many memories to include in each prompt (default: 20). Lower = fewer tokens, Higher = more context |
+| Setting               | Values     | Description                                                                                                        |
+| --------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| **injectionMode**     | `0` or `1` | `0` = inject at session start only (~76% token savings). `1` = inject on every prompt (default, real-time updates) |
+| **subagentMode**      | `0` or `1` | `0` = disable memory injection for sub-agents. `1` = enable for sub-agents (default)                               |
+| **embeddingsEnabled** | `0` or `1` | `0` = use Jaccard similarity only (fast, default). `1` = use hybrid semantic embeddings (experimental)             |
+| **maxMemories**       | `10-50`    | How many memories to include in each prompt (default: 20). Lower = fewer tokens, Higher = more context             |
 
 **Injection Mode Trade-off:**
+
 - **Mode 1 (ALWAYS)** - Default. Real-time memory updates, at each prompt. New memories appear immediately. Best for most users.
 - **Mode 0 (SESSION_START)**: Memories are injected once at session start (both /new and --continue). New memories extracted during the session won't appear until you restart OpenCode. Best for long sessions (20+ prompts) where token cost matters.
 
@@ -169,14 +168,15 @@ AI Vector Memories for OpenCode creates a configuration file at `~/.ai-vector-me
 
 You can also configure via environment variables (override config file):
 
-| Variable | Values | Description |
-|----------|--------|-------------|
-| `TRUE_MEM_INJECTION_MODE` | `0` or `1` | Override injectionMode setting |
-| `TRUE_MEM_SUBAGENT_MODE` | `0` or `1` | Override subagentMode setting |
-| `TRUE_MEM_EMBEDDINGS` | `0` or `1` | Override embeddingsEnabled setting |
-| `TRUE_MEM_MAX_MEMORIES` | `10-50` | Override maxMemories setting |
+| Variable                  | Values     | Description                        |
+| ------------------------- | ---------- | ---------------------------------- |
+| `TRUE_MEM_INJECTION_MODE` | `0` or `1` | Override injectionMode setting     |
+| `TRUE_MEM_SUBAGENT_MODE`  | `0` or `1` | Override subagentMode setting      |
+| `TRUE_MEM_EMBEDDINGS`     | `0` or `1` | Override embeddingsEnabled setting |
+| `TRUE_MEM_MAX_MEMORIES`   | `10-50`    | Override maxMemories setting       |
 
 Example:
+
 ```bash
 export TRUE_MEM_INJECTION_MODE=1
 export TRUE_MEM_MAX_MEMORIES=25
@@ -192,6 +192,7 @@ opencode
 Just have conversations with OpenCode. AI Vector Memories extracts relevant info in the background.
 
 **What gets stored**:
+
 - User preferences: "I prefer TypeScript over JavaScript"
 - Constraints: "Never use var keyword"
 - Decisions: "We decided to use SQLite instead of Postgres"
@@ -234,22 +235,22 @@ Use phrases like "Remember this:" or "Remember that ..." to force storage:
 
 By default, explicit intent memories are stored at **project scope** (only visible in the current project). To make them **global** (available in all projects), include a global scope keyword anywhere in your phrase:
 
-| Language | Global Scope Keywords |
-|----------|---------------------|
-| **English** | "always", "everywhere", "for all projects", "in every project", "globally" |
-| **Italian** | "sempre", "ovunque", "per tutti i progetti", "in ogni progetto", "globalmente" |
-| **Spanish** | "siempre", "en todas partes", "para todos los proyectos" |
-| **French** | "toujours", "partout", "pour tous les projets" |
-| **German** | "immer", "überall", "für alle projekte" |
-| **Portuguese** | "sempre", "em todos os projetos" |
+| Language       | Global Scope Keywords                                                          |
+| -------------- | ------------------------------------------------------------------------------ |
+| **English**    | "always", "everywhere", "for all projects", "in every project", "globally"     |
+| **Italian**    | "sempre", "ovunque", "per tutti i progetti", "in ogni progetto", "globalmente" |
+| **Spanish**    | "siempre", "en todas partes", "para todos los proyectos"                       |
+| **French**     | "toujours", "partout", "pour tous les projets"                                 |
+| **German**     | "immer", "überall", "für alle projekte"                                        |
+| **Portuguese** | "sempre", "em todos os projetos"                                               |
 
 **Examples**:
 
-| Memory | Scope | Phrase |
-|---------|---------|---------|
-| **Project** | `project_scope = current_project` | "Remember that we use REST for the API" |
-| **Global** | `project_scope = null` | "Remember to _always_ run tests before committing" |
-| **Global** | `project_scope = null` | "Remember that I _always_ use Typescript _in every project_" |
+| Memory      | Scope                             | Phrase                                                       |
+| ----------- | --------------------------------- | ------------------------------------------------------------ |
+| **Project** | `project_scope = current_project` | "Remember that we use REST for the API"                      |
+| **Global**  | `project_scope = null`            | "Remember to _always_ run tests before committing"           |
+| **Global**  | `project_scope = null`            | "Remember that I _always_ use Typescript _in every project_" |
 
 ---
 
@@ -268,13 +269,20 @@ When enabled, AI Vector Memories uses a lightweight transformer model (all-MiniL
 ### How It Works
 
 **Architecture:**
+
 ```
 Main Thread (Bun) → Node.js Worker Process → Transformers.js v4 → ONNX Runtime
 ```
 
+**RuVector references:**
+
+- **RuVector Docs Index**: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
+- **RuVector npm Package README**: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
+
 The plugin spawns a separate Node.js process to run the transformer model in isolation, ensuring Bun stability. The model is automatically downloaded on first use and cached locally.
 
 **Trade-offs:**
+
 - **Storage**: ~23MB for cached model (downloaded once to `~/.ai-vector-memories/models/`)
 - **Memory**: ~200MB RAM when worker is active (during embedding generation)
 - **Init time**: 2-3 seconds on first use (model loading)
@@ -286,7 +294,7 @@ Edit `~/.ai-vector-memories/config.jsonc` and set:
 
 ```jsonc
 {
-  "embeddingsEnabled": 1
+  "embeddingsEnabled": 1,
 }
 ```
 
@@ -362,15 +370,15 @@ ai-vector-memories/
 
 ## Memory Classifications
 
-| Type | Decay | Store | Scope | Example |
-|------|-------|-------|-------|---------|
-| **constraint** | Never | STM | Global | "Never use `var`" |
-| **preference** | Never | STM | Global | "Prefers functional style" |
-| **learning** | Never | LTM | Global | "Learned bun:sqlite API" |
-| **procedural** | Never | STM | Global | "Run tests before commit" |
-| **decision** | Never | LTM | Project | "Decided SQLite over Postgres" |
-| **semantic** | Never | STM | Project | "API uses REST, not GraphQL" |
-| **episodic** | Yes (7d) | STM | Project | "Yesterday we refactored auth" |
+| Type           | Decay    | Store | Scope   | Example                        |
+| -------------- | -------- | ----- | ------- | ------------------------------ |
+| **constraint** | Never    | STM   | Global  | "Never use `var`"              |
+| **preference** | Never    | STM   | Global  | "Prefers functional style"     |
+| **learning**   | Never    | LTM   | Global  | "Learned bun:sqlite API"       |
+| **procedural** | Never    | STM   | Global  | "Run tests before commit"      |
+| **decision**   | Never    | LTM   | Project | "Decided SQLite over Postgres" |
+| **semantic**   | Never    | STM   | Project | "API uses REST, not GraphQL"   |
+| **episodic**   | Yes (7d) | STM   | Project | "Yesterday we refactored auth" |
 
 ---
 
@@ -378,26 +386,26 @@ ai-vector-memories/
 
 ### 7-Feature Scoring Model
 
-| Feature | Weight | Description |
-|---------|--------|-------------|
-| Recency | 0.20 | Time since creation (0 = recent, 1 = old) |
-| Frequency | 0.15 | Number of accesses (log scale) |
-| Importance | 0.25 | Combination of signals (diminishing returns) |
-| Utility | 0.20 | Usefulness for current task |
-| Novelty | 0.10 | Distance from existing memories |
-| Confidence | 0.10 | Consensus of extraction evidence |
-| Interference | -0.10 | Penalty for conflicts |
+| Feature      | Weight | Description                                  |
+| ------------ | ------ | -------------------------------------------- |
+| Recency      | 0.20   | Time since creation (0 = recent, 1 = old)    |
+| Frequency    | 0.15   | Number of accesses (log scale)               |
+| Importance   | 0.25   | Combination of signals (diminishing returns) |
+| Utility      | 0.20   | Usefulness for current task                  |
+| Novelty      | 0.10   | Distance from existing memories              |
+| Confidence   | 0.10   | Consensus of extraction evidence             |
+| Interference | -0.10  | Penalty for conflicts                        |
 
 **Strength Formula**: `Strength = Sum(weight_i * feature_i)` clamped to [0, 1]
 
 ### Four-Layer False Positive Prevention
 
-| Layer | Purpose |
-|-------|---------|
-| 1. Question Detection | Filter questions before classification |
-| 2. Negative Patterns | AI meta-talk, list selections, 1st person recall, remind-me recall (10 languages) |
-| 3. Multi-Keyword + Sentence-Level | Require 2+ signals in the same sentence |
-| 4. Confidence Threshold | Store only if score >= 0.6 |
+| Layer                             | Purpose                                                                           |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| 1. Question Detection             | Filter questions before classification                                            |
+| 2. Negative Patterns              | AI meta-talk, list selections, 1st person recall, remind-me recall (10 languages) |
+| 3. Multi-Keyword + Sentence-Level | Require 2+ signals in the same sentence                                           |
+| 4. Confidence Threshold           | Store only if score >= 0.6                                                        |
 
 ### Decay Strategy
 
@@ -413,6 +421,7 @@ Want to contribute or test your own changes? Here's how:
 1. **Fork this repository**
 
 2. **Build the plugin**
+
    ```bash
    cd ai-vector-memories
    bun install
@@ -420,11 +429,10 @@ Want to contribute or test your own changes? Here's how:
    ```
 
 3. **Use your local version** in `~/.config/opencode/opencode.json`:
+
    ```json
    {
-     "plugin": [
-       "file:///path/to/your/fork/ai-vector-memories"
-     ]
+     "plugin": ["file:///path/to/your/fork/ai-vector-memories"]
    }
    ```
 

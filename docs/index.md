@@ -1,16 +1,24 @@
 # Project Documentation Index
 
 ## Project Overview
+
 - **Type:** monolith
 - **Primary Language:** TypeScript
 - **Architecture:** Plugin / Library Architecture
 
 ## Quick Reference
+
 - **Tech Stack:** TypeScript, Bun, OpenCode SDK, SQLite, ruvector, @huggingface/transformers
 - **Entry Point:** src/index.ts
 - **Architecture Pattern:** Event-driven plugin with embedded SQLite and Vector store
 
+## External References
+
+- **RuVector Docs Index**: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
+- **RuVector npm Package README**: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
+
 ## Generated Documentation
+
 - [Project Overview](./project-overview.md)
 - [Architecture](./architecture.md)
 - [Source Tree Analysis](./source-tree-analysis.md)
@@ -21,12 +29,15 @@
 - [API Contracts](./api-contracts.md) _(To be generated)_
 
 ## Existing Documentation
+
 - [README.md](../README.md) - Main project documentation and usage.
 - [AGENTS.md](../AGENTS.md) - Rules and context for AI agents interacting with this repo.
 - [CHANGELOG.md](../CHANGELOG.md) - History of releases.
 
 ## Getting Started
+
 To begin working on this project:
+
 1. Ensure you have [Bun](https://bun.sh/) installed.
 2. Run `bun install` to install dependencies.
 3. Use `bun run dev` to watch for changes during active development.

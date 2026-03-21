@@ -1,158 +1,125 @@
 # Repository Agent Guide (AGENTS.md)
 
-This repo is a Bun + TypeScript OpenCode plugin that provides persistent "memory"
-(SQLite + optional embeddings/RuVector). This file is for agentic coding tools
-operating inside this repository.
+This repo is a Bun + TypeScript OpenCode plugin that provides persistent memory via SQLite and RuVector.
+This file is the definitive guide for agentic coding tools (like Cursor, Copilot, OpenCode) operating here.
 
-If you add new tooling (lint/tests/format), update this file.
+## Quick Start & Commands
 
-## Quick Start
+The project uses `bun` as the primary runtime and package manager.
 
-- Install: `bun install`
-- Typecheck: `bun run typecheck`
-- Build: `bun run build`
-- Dev watch: `bun run dev`
-
-## Commands (Build / Lint / Test)
-
-Build
-- `bun run build`
+- **Install:** `bun install`
+- **Typecheck:** `bun run typecheck` (runs `tsc --noEmit`)
+- **Build:** `bun run build`
   - Bundles `src/index.ts` to `dist/index.js` (Bun bundler)
-  - Emits TypeScript declarations (`tsc --emitDeclarationOnly`)
+  - Emits TS declarations (`tsc --emitDeclarationOnly`)
   - Bundles worker `src/memory/embedding-worker.ts` to `dist/memory/`
+- **Dev watch:** `bun run dev` (watches `src/index.ts` -> `dist/`)
 
-Development
-- `bun run dev`
-  - Watches and rebuilds `src/index.ts` into `dist/`
+## Testing (Bun Test)
 
-Typecheck
-- `bun run typecheck` (runs `tsc --noEmit`)
+There are currently no `*.test.ts` / `*.spec.ts` files. If/when tests exist, use Bun's test runner:
 
-Lint / Format
-- No linter/formatter is configured (no ESLint/Prettier/Biome configs or scripts).
-- Keep edits consistent with existing style and rely on `bun run typecheck`.
+- Run all tests: `bun test`
+- Run a single test file: `bun test src/foo.test.ts`
+- Run tests by filename pattern: `bun test memory classifier`
+- Run a single test by name (regex): `bun test --test-name-pattern "my test name"`
+- Re-run a flaky test file: `bun test src/foo.test.ts --rerun-each 20`
 
-Tests
-- There are currently no `*.test.ts` / `*.spec.ts` files in this repo.
-- If/when tests exist, use Bun's test runner:
-  - Run all tests: `bun test`
-  - Run a single test file: `bun test src/foo.test.ts`
-  - Run tests by filename pattern(s): `bun test memory classifier`
-  - Run a single test by name (regex): `bun test --test-name-pattern "my test name"`
-  - Re-run a flaky test file: `bun test src/foo.test.ts --rerun-each 20`
+## Linting & Formatting
 
-CI / Release
-- GitHub Action publishes to npm on pushes to `main` when `package.json` changes:
-  - `.github/workflows/release.yml`
+- No linter/formatter is configured (no ESLint/Prettier/Biome configs).
+- **Rule:** Keep edits consistent with existing style and rely heavily on `bun run typecheck`.
 
-## Repository-Specific Rules (Cursor / Copilot)
+## Repository-Specific Rules & Context
 
-- No `.cursor/rules/`, `.cursorrules`, or `.github/copilot-instructions.md` found.
+- **Cursor / Copilot:** No `.cursor/rules/`, `.cursorrules`, or `.github/copilot-instructions.md` exist.
+- **CI / Release:** Pushes to `main` with `package.json` changes trigger a GitHub Action to publish to npm.
 
-If any of these files are added later, they override this document.
+## Project Method & References
+
+- **Method:** This repository uses BMAD Method for project workflow and coordination.
+- **BMAD base config:** `_bmad/`
+- **Project management artifacts:** `_bmad-output/`
+- **Project documentation root:** `docs/`
+- **BMAD guide (official):** https://docs.bmad-method.org/llms-full.txt
+- **BMAD guide (local copy):** `docs/bmad-method/llms-full.txt`
+- **Upstream fork origin:** https://github.com/rizal72/true-mem
+- **RuVector docs index:** https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
+- **RuVector npm package README:** https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
+
+## Code Style Guidelines
+
+### 1. Language, Modules, and Compilation
+
+- **Strict TypeScript:** `strict: true` in `tsconfig.json`.
+- **ESM Project:** `package.json` has `"type": "module"`.
+- **Imports:** Use `.js` extensions for relative TypeScript imports.
+  - ✅ Good: `import { log } from './logger.js'`
+  - ❌ Bad: `import { log } from './logger'` or `./logger.ts`
+
+### 2. Formatting and General Style
+
+- **Indentation:** 2 spaces.
+- **Quotes:** Single quotes (`'`).
+- **Semicolons:** Semicolons are explicitly used; keep them.
+- **Structure:** Keep functions short and early-return when possible.
+
+### 3. Imports Grouping
+
+- Prefer `import type { ... }` for types.
+- Avoid `any`; use `unknown` and type-narrow.
+- Grouping:
+  1. Node built-ins (`fs`, `path`, `crypto`)
+  2. External deps (`@opencode-ai/*`, `uuid`, `ruvector`)
+  3. Internal modules (`./` and `../`)
+
+### 4. Types and Naming
+
+- `PascalCase` for classes, types, interfaces.
+- `camelCase` for functions, methods, variables.
+- `UPPER_SNAKE_CASE` for module-level constants.
+- Prefer explicit return types on exported functions.
+- For optional properties:
+  - In TypeScript objects: prefer `undefined`
+  - At persistence boundaries (SQLite): use `null`
+
+### 5. Error Handling and Logging
+
+- **Fail-Open:** Hooks should catch errors, log them, and continue whenever safe.
+- Only `throw` when the caller can safely handle it (e.g. init failures).
+- Use the file logger `log()` (`src/logger.ts`) instead of `console.*` (interferes with TUI).
+- Keep hook handlers fast. Prefer fire-and-forget async patterns for non-critical work.
+
+### 6. Transactions, Async Work, and SQLite
+
+- Keep async work (like similarity search) out of SQLite `BEGIN TRANSACTION` blocks.
+- On any error inside a transaction, ensure `ROLLBACK` is executed.
+
+### 7. Config and JSONC
+
+- Config files are JSONC.
+- Parsing: strip comments then `JSON.parse` (`src/utils/jsonc.ts`).
+- Writing: preserve explanatory comments (`src/config/config.ts`).
+- Read config as untrusted; catch errors and fall back to defaults.
 
 ## Runtime Files / Paths
 
-Important: code uses `~/.ai-vector-memories/` for runtime state. Some documentation may
-still mention `~/.ai-vector-memories/`; do not blindly rename/delete either on
-user machines.
+Code uses `~/.ai-vector-memories/` for runtime state. Do not blindly rename/delete on user machines.
 
-- Debug log: `~/.ai-vector-memories/plugin-debug.log` (`src/logger.ts`)
-- Config (JSONC): `~/.ai-vector-memories/config.jsonc` (`src/config/config.ts`)
-- Worktree cache: `~/.ai-vector-memories/.worktree-cache` (`src/adapters/opencode/index.ts`)
-- Database path: from `PsychMemConfig.dbPath` (default comes from `src/config.ts`)
-
-OpenCode config
-- Plugin list: `~/.config/opencode/opencode.jsonc`
+- **Debug log:** `~/.ai-vector-memories/plugin-debug.log`
+- **Config:** `~/.ai-vector-memories/config.jsonc`
+- **Worktree cache:** `~/.ai-vector-memories/.worktree-cache`
+- **Database:** from `PsychMemConfig.dbPath`
 
 ## Feature Flags / Env Vars
 
 - `TRUE_MEM_INJECTION_MODE`: `0` session-start only, `1` every prompt
 - `TRUE_MEM_SUBAGENT_MODE`: `0` disable injection into sub-agents, `1` enable
 - `TRUE_MEM_MAX_MEMORIES`: number of memories to inject
-- `TRUE_MEM_EMBEDDINGS`: `0` Jaccard-only, `1` hybrid (embeddings worker)
-
-## Code Style Guidelines
-
-### Language, modules, and compilation
-
-- TypeScript with `strict: true` (`tsconfig.json`).
-- ESM project (`package.json` has `"type": "module"`).
-- Keep TS relative imports using `.js` extensions (Bun/Node ESM):
-  - Good: `import { log } from './logger.js'`
-  - Avoid: `import { log } from './logger'` or `./logger.ts`
-
-### Formatting and general style
-
-- Indentation: 2 spaces.
-- Quotes: single quotes.
-- Semicolons: used; keep them.
-- Keep functions short and early-return when possible.
-
-### Imports
-
-- Prefer `import type { ... }` for types.
-- Avoid `any`; use `unknown` and narrow.
-- Keep a simple import grouping:
-  1) Node built-ins (`fs`, `path`, `os`, `crypto`)
-  2) External deps (`@opencode-ai/*`, `uuid`, `ruvector`)
-  3) Internal modules (relative `./` and `../`)
-
-### Types and naming
-
-- Naming conventions:
-  - `PascalCase` for classes, types, interfaces
-  - `camelCase` for functions, methods, variables
-  - `UPPER_SNAKE_CASE` for module-level constants
-- Prefer explicit return types on exported functions when not obvious.
-- For optional properties:
-  - In TypeScript objects: prefer `undefined` (idiomatic optional)
-  - At persistence boundaries (SQLite): use `null` as needed
-
-### Error handling and logging
-
-- This is an OpenCode plugin; hooks should be "fail-open":
-  - Catch errors, log them, and continue whenever safe.
-  - Only throw when the caller can safely handle it (e.g. init failures).
-- Use the file logger `log()` (`src/logger.ts`) instead of `console.*`.
-- Keep hook handlers fast; avoid blocking UI.
-  - Prefer fire-and-forget async patterns for non-critical work (see `src/index.ts`).
-
-### Transactions, async work, and SQLite
-
-- Keep async work out of SQLite transactions.
-  - Example pattern: do similarity search before `BEGIN TRANSACTION`.
-- On any error inside a transaction:
-  - Ensure `ROLLBACK` happens.
-  - Re-throw or convert to a typed error as appropriate.
-
-### Config and JSONC
-
-- Config files are JSONC.
-  - Parsing: strip comments then `JSON.parse` (`src/utils/jsonc.ts`).
-  - Writing: preserve explanatory comments (`src/config/config.ts`).
-- When reading config:
-  - Treat it as untrusted; catch and log parse errors.
-  - Fall back to defaults.
-
-### OpenCode-specific behavior
-
-- Avoid writing to stdout/stderr during plugin runtime; it can interfere with the TUI.
-- Be careful with memory injection markers; do not re-ingest injected content.
-  - Filtering exists in `src/adapters/opencode/index.ts`.
-
-## Release Workflow Notes
-
-- Automation: push to `main` with updated `package.json` triggers npm publish.
-- Version bump commands used in this repo:
-  - `npm version patch -m "release: v%s - <SHORT_REASON>"`
-  - `npm version minor -m "release: v%s - <SHORT_REASON>"`
-  - `npm version major -m "release: v%s - <SHORT_REASON>"`
+- `TRUE_MEM_EMBEDDINGS`: `0` Jaccard-only, `1` hybrid
 
 ## Practical Agent Tips
 
-- Before changing behavior in hooks, scan for:
-  - Hot-reload handling (`src/index.ts`)
-  - Debounce/queue logic (`src/extraction/queue.ts`, `src/adapters/opencode/index.ts`)
-  - Scope leakage safeguards (`src/storage/database.ts`, `src/adapters/opencode/index.ts`)
-- Prefer small, safe edits: this plugin runs inside another host process.
+- Before changing hooks, scan for hot-reload handling (`src/index.ts`) and debounce logic (`src/adapters/opencode/index.ts`).
+- Prevent memory self-ingestion (filter logic in `src/adapters/opencode/index.ts`).
+- Prefer small, safe edits; this runs inside a host process.

@@ -1,5 +1,5 @@
 /**
- * True-Mem Logger
+ * AI Vector Memories Logger
  * File-based logging to avoid SDK crashes
  */
 
@@ -7,7 +7,7 @@ import { appendFileSync, existsSync, mkdirSync, statSync, renameSync } from 'fs'
 import { homedir } from 'os';
 import { join } from 'path';
 
-const LOG_DIR = join(homedir(), '.true-mem');
+const LOG_DIR = join(homedir(), '.ai-vector-memories');
 const LOG_FILE = join(LOG_DIR, 'plugin-debug.log');
 const LOG_MAX_BYTES = 1024 * 1024; // 1 MB
 

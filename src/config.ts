@@ -1,5 +1,5 @@
 /**
- * True-Mem Configuration
+ * AI Vector Memories Configuration
  * 
  * Provides unified access to plugin configuration.
  * Uses loadConfig() from config/config.ts for user settings.
@@ -76,7 +76,7 @@ export function getDefaultConfig(): PsychMemConfig {
   
   return {
     agentType: 'opencode',
-    dbPath: '~/.true-mem/memory.db',
+    dbPath: '~/.ai-vector-memories/memory.db',
 
     // Decay rates (per hour)
     stmDecayRate: 0.05,     // ~32-hour half-life
@@ -113,7 +113,7 @@ export function getDefaultConfig(): PsychMemConfig {
     // OpenCode-specific
     opencode: getDefaultOpenCodeConfig(),
 
-    // True-Mem improvement: decay only episodic
+    // AI Vector Memories improvement: decay only episodic
     applyDecayOnlyToEpisodic: true,
     decayThreshold: 0.1,
   };
@@ -123,7 +123,7 @@ export function getDefaultConfig(): PsychMemConfig {
 // Note: This uses defaults, use getDefaultConfig() for runtime values
 export const DEFAULT_CONFIG: PsychMemConfig = {
   agentType: 'opencode',
-  dbPath: '~/.true-mem/memory.db',
+  dbPath: '~/.ai-vector-memories/memory.db',
 
   // Decay rates (per hour)
   stmDecayRate: 0.05,
@@ -160,7 +160,7 @@ export const DEFAULT_CONFIG: PsychMemConfig = {
   // OpenCode-specific
   opencode: getDefaultOpenCodeConfig(),
 
-  // True-Mem improvement: decay only episodic
+  // AI Vector Memories improvement: decay only episodic
   applyDecayOnlyToEpisodic: true,
   decayThreshold: 0.1,
 };

@@ -189,7 +189,7 @@ opencode
 
 ### Automatic Extraction
 
-Just have conversations with OpenCode. True-Mem extracts relevant info in the background.
+Just have conversations with OpenCode. AI Vector Memories extracts relevant info in the background.
 
 **What gets stored**:
 - User preferences: "I prefer TypeScript over JavaScript"
@@ -212,7 +212,7 @@ All three commands are equivalent and display all memories grouped by scope (Glo
 
 ### Delete a Memory
 
-To delete a specific memory from True-Mem, ask your AI assistant mentioning "true-mem" to avoid confusion with other memory plugins:
+To delete a specific memory from AI Vector Memories, ask your AI assistant mentioning "true-mem" to avoid confusion with other memory plugins:
 
 ```
 "Delete the true-mem memory about using bun"
@@ -255,11 +255,11 @@ By default, explicit intent memories are stored at **project scope** (only visib
 
 ## Advanced: Semantic Embeddings (Experimental)
 
-True-Mem includes an **experimental** NLP embeddings feature that provides semantic similarity search beyond basic Jaccard matching.
+AI Vector Memories includes an **experimental** NLP embeddings feature that provides semantic similarity search beyond basic Jaccard matching.
 
 ### What It Does
 
-When enabled, True-Mem uses a lightweight transformer model (all-MiniLM-L6-v2) to generate 384-dimensional embeddings for each memory. This enables:
+When enabled, AI Vector Memories uses a lightweight transformer model (all-MiniLM-L6-v2) to generate 384-dimensional embeddings for each memory. This enables:
 
 - **Semantic retrieval** - Find memories by meaning, not just keyword matching
 - **Better relevance** - Understands that "I like TypeScript" relates to "JavaScript preferences"

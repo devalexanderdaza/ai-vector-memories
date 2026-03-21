@@ -1,5 +1,5 @@
 /**
- * True-Mem OpenCode Adapter
+ * AI Vector Memories OpenCode Adapter
  */
 
 const BUILD_TIME = "2026-02-23T09:45:00.000Z";
@@ -50,7 +50,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 
-const WORKTREE_CACHE_FILE = join(homedir(), '.true-mem', '.worktree-cache');
+const WORKTREE_CACHE_FILE = join(homedir(), '.ai-vector-memories', '.worktree-cache');
 
 function getPersistedWorktree(): string | null {
   try {
@@ -261,12 +261,12 @@ export async function createTrueMemoryPlugin(
     client: ctx.client,
   };
 
-  log(`True-Mem initialized — worktree=${worktree}, maxMemories=${config.maxMemories}`);
+  log(`AI Vector Memories initialized — worktree=${worktree}, maxMemories=${config.maxMemories}`);
 
   // Extract project name and create professional startup message
   const projectName = worktree.split(/[/\\]/).pop() || 'Unknown';
   const version = getVersion();
-  const startupMessage = `🧠 True-Mem: Plugin loaded successfully | v${version} [${BUILD_TIME}] | Mode: Jaccard Similarity | Project: ${projectName}`;
+  const startupMessage = `🧠 AI Vector Memories: Plugin loaded successfully | v${version} [${BUILD_TIME}] | Mode: Jaccard Similarity | Project: ${projectName}`;
 
   // Log to file-based logger only (to avoid overwriting OpenCode TUI during lazy initialization)
   log(startupMessage);

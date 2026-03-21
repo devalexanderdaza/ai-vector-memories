@@ -1,5 +1,5 @@
 /**
- * True-Mem Type Definitions
+ * AI Vector Memories Type Definitions
  * Adapted from PsychMem for OpenCode
  */
 
@@ -448,7 +448,7 @@ export interface PsychMemConfig {
   sweep: SweepConfig;
   opencode: OpenCodeConfig;
   
-  // True-Mem additions
+  // AI Vector Memories additions
   applyDecayOnlyToEpisodic?: boolean;
   decayThreshold?: number;
 }

@@ -1,5 +1,5 @@
 /**
- * Global state for True-Mem plugin
+ * Global state for AI Vector Memories plugin
  * Separated to avoid circular imports
  */
 import type { MemoryUnit } from './types.js';

@@ -1,5 +1,5 @@
 /**
- * True-Mem Embeddings (Hybrid: Jaccard + Transformers.js)
+ * AI Vector Memories Embeddings (Hybrid: Jaccard + Transformers.js)
  * Jaccard similarity as baseline, optional NLP embeddings via Transformers.js
  */
 

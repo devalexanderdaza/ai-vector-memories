@@ -1,5 +1,5 @@
 /**
- * True-Mem Hybrid NLP Embeddings Service
+ * AI Vector Memories Hybrid NLP Embeddings Service
  * Uses Transformers.js v4 with Node.js child process isolation
  * Graceful degradation to Jaccard similarity
  */

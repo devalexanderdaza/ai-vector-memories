@@ -14,7 +14,7 @@ import { log } from '../logger.js';
 import { DEFAULT_USER_CONFIG, DEFAULT_STATE } from '../types/config.js';
 import { generateConfigWithComments } from './config.js';
 
-const CONFIG_DIR = join(homedir(), '.true-mem');
+const CONFIG_DIR = join(homedir(), '.ai-vector-memories');
 const OLD_CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 const STATE_FILE = join(CONFIG_DIR, 'state.json');
 const NEW_CONFIG_FILE = join(CONFIG_DIR, 'config.jsonc');

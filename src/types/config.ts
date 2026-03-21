@@ -1,5 +1,5 @@
 /**
- * True-Mem Configuration Types
+ * AI Vector Memories Configuration Types
  * 
  * Separates user configuration (config.json) from runtime state (state.json)
  */
@@ -16,7 +16,7 @@ export type SubAgentMode = 0 | 1;
 
 /**
  * User configuration - persistent settings that users can customize
- * Stored in: ~/.true-mem/config.json
+ * Stored in: ~/.ai-vector-memories/config.json
  */
 export interface TrueMemUserConfig {
   injectionMode: InjectionMode;
@@ -27,7 +27,7 @@ export interface TrueMemUserConfig {
 
 /**
  * Runtime state - internal plugin state (not user-facing)
- * Stored in: ~/.true-mem/state.json
+ * Stored in: ~/.ai-vector-memories/state.json
  */
 export interface TrueMemState {
   embeddingsEnabled: boolean;

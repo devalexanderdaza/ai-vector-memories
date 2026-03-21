@@ -32,7 +32,7 @@ export function getVersion(): string {
     }
     return 'unknown';
   } catch (error) {
-    console.error('[True-Mem] Version detection error:', error);
+    console.error('[AI Vector Memories] Version detection error:', error);
     return 'unknown';
   }
 }

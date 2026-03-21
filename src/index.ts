@@ -33,7 +33,7 @@ let state: {
 };
 
 // Track if toast shown (per process, not per session)
-let hasShownToast = false;
+let hasShownToast = true; // Set to true to prevent toast during development - set to false for production
 
 const TrueMemory: Plugin = async (ctx) => {
   // Store ctx

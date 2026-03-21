@@ -10,7 +10,7 @@
  * For embeddingsEnabled, also checks user config (config.json) as fallback:
  * Priority: process.env → user config (config.json) → state file → false (default)
  * 
- * State file: ~/.true-mem/state.json
+ * State file: ~/.ai-vector-memories/state.json
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -22,7 +22,7 @@ import type { TrueMemState } from '../types/config.js';
 import { DEFAULT_STATE } from '../types/config.js';
 import { getEmbeddingsEnabledFromConfig } from './config.js';
 
-const CONFIG_DIR = join(homedir(), '.true-mem');
+const CONFIG_DIR = join(homedir(), '.ai-vector-memories');
 const STATE_FILE = join(CONFIG_DIR, 'state.json');
 
 /**

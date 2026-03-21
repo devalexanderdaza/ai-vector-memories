@@ -8,7 +8,7 @@
  * 2. config.json file
  * 3. Default values
  * 
- * Config file: ~/.true-mem/config.json
+ * Config file: ~/.ai-vector-memories/config.json
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
@@ -19,7 +19,7 @@ import type { TrueMemUserConfig, InjectionMode, SubAgentMode } from '../types/co
 import { DEFAULT_USER_CONFIG } from '../types/config.js';
 import { parseJsonc } from '../utils/jsonc.js';
 
-const CONFIG_DIR = join(homedir(), '.true-mem');
+const CONFIG_DIR = join(homedir(), '.ai-vector-memories');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.jsonc');
 
 /**

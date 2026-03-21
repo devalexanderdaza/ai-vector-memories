@@ -1,5 +1,5 @@
 /**
- * True-Mem Database Layer
+ * AI Vector Memories Database Layer
  * SQLite with runtime-agnostic adapter (supports Node.js + Bun)
  */
 
@@ -803,7 +803,7 @@ export class MemoryDatabase {
     const onlyEpisodic = this.config.applyDecayOnlyToEpisodic ?? false;
 
     for (const mem of memories) {
-      // True-Mem improvement: skip non-episodic if configured
+      // AI Vector Memories improvement: skip non-episodic if configured
       if (onlyEpisodic && mem.classification !== 'episodic') {
         continue;
       }

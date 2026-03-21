@@ -1,5 +1,5 @@
 /**
- * True-Mem Atomic Injection
+ * AI Vector Memories Atomic Injection
  * XML-based memory injection with persona boundary support
  */
 

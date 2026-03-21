@@ -1,5 +1,5 @@
 /**
- * True-Mem Shutdown Manager
+ * AI Vector Memories Shutdown Manager
  * Synchronous shutdown mechanism to prevent Bun crashes
  * 
  * CRITICAL: No signal handlers - Bun handles cleanup automatically

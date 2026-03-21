@@ -9,7 +9,7 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 // Local log function that writes to the same log file as the main thread
-const LOG_DIR = join(homedir(), '.true-mem');
+const LOG_DIR = join(homedir(), '.ai-vector-memories');
 const LOG_FILE = join(LOG_DIR, 'plugin-debug.log');
 
 function log(message: string, data?: unknown): void {
@@ -36,7 +36,7 @@ async function loadTransformers() {
   if (env?.backends?.onnx?.wasm) {
     env.backends.onnx.wasm.numThreads = 2;
   }
-  env.cacheDir = process.env.HOME ? `${process.env.HOME}/.true-mem/models` : '~/.true-mem/models';
+  env.cacheDir = process.env.HOME ? `${process.env.HOME}/.ai-vector-memories/models` : '~/.ai-vector-memories/models';
   
   log('Transformers.js configured, cacheDir:', env.cacheDir);
 }

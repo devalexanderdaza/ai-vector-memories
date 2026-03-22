@@ -1,113 +1,32 @@
 # AI Vector Memories for OpenCode
 
-> A persistent memory plugin for OpenCode with cognitive psychology-based memory management.
+Persistent memory plugin for OpenCode with SQLite + RuVector retrieval and cognitive memory management.
 
----
+## Why This Project Exists
 
-## Table of Contents
+AI coding sessions lose context quickly. This plugin stores reusable knowledge from conversations so the assistant can remember:
 
-- [Overview](#overview)
-- [Key Features](#key-features)
-- [Noise Filtering](#noise-filtering)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Advanced: Semantic Embeddings (Experimental)](#advanced-semantic-embeddings-experimental)
-- [Architecture](#architecture)
-- [Memory Classifications](#memory-classifications)
-- [Technical Details](#technical-details)
-- [Contributing](#contributing)
-- [Debug](#debug)
+- User preferences
+- Project decisions
+- Long-lived constraints
+- High-signal semantic facts
 
----
+The goal is practical continuity across sessions with low runtime overhead.
 
-## Overview
+## What You Get
 
-**AI Vector Memories for OpenCode** is a memory plugin for OpenCode that enables AI coding agents to remember information across sessions and projects. It doesn't just store information - it manages memory like a human mind would.
+- Persistent memory with global and project scopes
+- Hybrid retrieval (Jaccard + optional embeddings)
+- Decision-aware reconsolidation (duplicate/conflict/complement)
+- Injection quotas and optional adaptive balancing
+- Optional compression under token pressure
+- Fail-open plugin behavior to avoid blocking host workflows
 
----
+## Quick Start
 
-## The Problem
+### 1. Install in OpenCode
 
-If you've ever had to repeat your preferences to your AI assistant every time you start a new session, you know the pain. "I prefer TypeScript over JavaScript", "Never use `var`", "Always run tests before committing" - things you've already said, but the AI forgot.
-
----
-
-## The Solution
-
-**AI Vector Memories for OpenCode** automatically extracts and stores memories from your conversations:
-
-- **Preferences**: "I prefer functional style over OOP"
-- **Constraints**: "Never use `var` keyword"
-- **Decisions**: "We decided to use SQLite instead of Postgres for this project"
-- **Semantic info**: "The API uses REST, not GraphQL"
-- **Learning**: "Learned that bun:sqlite is built-in"
-
-Next time you open OpenCode, it remembers. No more repeating yourself.
-
----
-
-## The Psychology Behind It
-
-What makes **AI Vector Memories for OpenCode** different from a simple database? It's modeled after how human memory actually works:
-
-**Ebbinghaus Forgetting Curve** - Episodic memories fade over time (7-day default), while preferences and decisions stay permanent. Just like your brain forgets what you had for lunch last Tuesday but remembers your favorite color.
-
-**7-Feature Scoring Model** - Every memory is scored using Recency, Frequency, Importance, Utility, Novelty, Confidence, and Interference. This determines which memories surface when you need them.
-
-**Dual-Store Architecture (STM/LTM)** - Short-term and long-term memory stores with automatic promotion. High-strength memories get promoted to LTM; weak ones stay in STM or decay.
-
-**Four-Layer Defense System** - Prevents false positives with Question Detection (filters questions before classification), Negative Pattern filtering (including AI meta-talk detection), Multi-Keyword Scoring with sentence-level isolation, Confidence Thresholds, and Role Validation (only Human messages for user-level preferences).
-
-**Reconsolidation** - When new information conflicts with existing memories, the system detects similarity and handles it intelligently (merge duplicates, keep both complements, or resolve conflicts).
-
-**Jaccard Similarity Search** - Fast, lightweight semantic retrieval without heavy ML dependencies.
-
----
-
-## Key Features
-
-| Feature                      | Description                                                              |
-| ---------------------------- | ------------------------------------------------------------------------ |
-| **Dual-Scope Memory**        | Global (follows you across projects) + Project-specific                  |
-| **Non-Blocking**             | Async extraction, no UI freezes or QUEUED states                         |
-| **Multilingual**             | Full support for Italian, Spanish, French, German, and 11 more languages |
-| **Smart Decay**              | Only episodic memories fade; preferences and decisions stay forever      |
-| **Zero Native Dependencies** | Works on Bun and Node 22+ with built-in SQLite                           |
-| **Multilingual**             | Full support for Italian, Spanish, French, German, and 11 more languages |
-
----
-
-## Noise Filtering
-
-What truly sets **AI Vector Memories for OpenCode** apart is its ability to distinguish **signal from noise**. Unlike simpler memory plugins that store everything matching a keyword, **AI Vector Memories for OpenCode** understands context and intent:
-
-**What gets filtered OUT:**
-
-| Pattern Type      | Example                          | Why filtered                                    |
-| ----------------- | -------------------------------- | ----------------------------------------------- |
-| Questions         | "Do you remember this?"          | It's a question, not a statement                |
-| 1st person recall | "I remember when we fixed that"  | Recounting, not requesting storage              |
-| Remind-me recall  | "Remind me how we did this"      | Asking AI to recall info, not store             |
-| AI meta-talk      | "Goal: The user is trying to..." | AI-generated, not user content                  |
-| List selections   | "I prefer option 3"              | Context-specific choice, not general preference |
-
-**What gets stored:**
-
-| Pattern Type | Example                               | Why stored                   |
-| ------------ | ------------------------------------- | ---------------------------- |
-| Imperatives  | "Remember this: always run tests"     | Explicit storage request     |
-| Preferences  | "I prefer TypeScript over JavaScript" | General, reusable preference |
-| Decisions    | "We decided to use SQLite"            | Project-level decision       |
-| Constraints  | "Never use var keyword"               | Permanent rule               |
-
-All filtering patterns support **10 languages**: English, Italian, Spanish, French, German, Portuguese, Dutch, Polish, Turkish, and Russian.
-
----
-
-## Installation
-
-Add to your `~/.config/opencode/opencode.jsonc`:
+Add the plugin name to your OpenCode config:
 
 ```jsonc
 {
@@ -115,371 +34,113 @@ Add to your `~/.config/opencode/opencode.jsonc`:
 }
 ```
 
-OpenCode will automatically download the plugin from npm.
+Restart OpenCode.
 
-A `~/.ai-vector-memories/` directory will be created to store the SQLite database and debug logs.
+### 2. Runtime Directory
 
-After restarting OpenCode, you'll see a toast notification confirming the plugin is loaded:
+On first run, the plugin creates:
 
+- `~/.ai-vector-memories/config.jsonc`
+- `~/.ai-vector-memories/plugin-debug.log`
+- SQLite database files (path controlled by config)
+
+### 3. Local Development Setup
+
+```bash
+bun install
+bun run typecheck
+bun run build
 ```
-AI Vector Memories for OpenCode vX.X.X
-Memory active.
-```
-
-This confirms AI Vector Memories for OpenCode is installed and working correctly.
-
----
 
 ## Configuration
 
-AI Vector Memories for OpenCode creates a configuration file at `~/.ai-vector-memories/config.jsonc` on first run. You can edit this file to customize behavior:
+Default config file: `~/.ai-vector-memories/config.jsonc`
 
 ```jsonc
 {
-  // Injection mode: 0 = session start only, 1 = every prompt (default, real-time updates)
   "injectionMode": 1,
-
-  // Sub-agent mode: 0 = disabled, 1 = enabled (default)
   "subagentMode": 1,
-
-  // Embeddings: 0 = Jaccard similarity only, 1 = hybrid (Jaccard + embeddings)
   "embeddingsEnabled": 0,
-
-  // Maximum memories to inject per prompt (10-50 recommended)
   "maxMemories": 20,
 }
 ```
 
-### Settings Explained
-
-| Setting               | Values     | Description                                                                                                        |
-| --------------------- | ---------- | ------------------------------------------------------------------------------------------------------------------ |
-| **injectionMode**     | `0` or `1` | `0` = inject at session start only (~76% token savings). `1` = inject on every prompt (default, real-time updates) |
-| **subagentMode**      | `0` or `1` | `0` = disable memory injection for sub-agents. `1` = enable for sub-agents (default)                               |
-| **embeddingsEnabled** | `0` or `1` | `0` = use Jaccard similarity only (fast, default). `1` = use hybrid semantic embeddings (experimental)             |
-| **maxMemories**       | `10-50`    | How many memories to include in each prompt (default: 20). Lower = fewer tokens, Higher = more context             |
-
-**Injection Mode Trade-off:**
-
-- **Mode 1 (ALWAYS)** - Default. Real-time memory updates, at each prompt. New memories appear immediately. Best for most users.
-- **Mode 0 (SESSION_START)**: Memories are injected once at session start (both /new and --continue). New memories extracted during the session won't appear until you restart OpenCode. Best for long sessions (20+ prompts) where token cost matters.
-
-### Environment Variables
-
-You can also configure via environment variables (override config file):
-
-| Variable                  | Values     | Description                        |
-| ------------------------- | ---------- | ---------------------------------- |
-| `TRUE_MEM_INJECTION_MODE` | `0` or `1` | Override injectionMode setting     |
-| `TRUE_MEM_SUBAGENT_MODE`  | `0` or `1` | Override subagentMode setting      |
-| `TRUE_MEM_EMBEDDINGS`     | `0` or `1` | Override embeddingsEnabled setting |
-| `TRUE_MEM_MAX_MEMORIES`   | `10-50`    | Override maxMemories setting       |
-
-Example:
-
-```bash
-export TRUE_MEM_INJECTION_MODE=1
-export TRUE_MEM_MAX_MEMORIES=25
-opencode
-```
-
----
-
-## Usage
-
-### Automatic Extraction
-
-Just have conversations with OpenCode. AI Vector Memories extracts relevant info in the background.
-
-**What gets stored**:
-
-- User preferences: "I prefer TypeScript over JavaScript"
-- Constraints: "Never use var keyword"
-- Decisions: "We decided to use SQLite instead of Postgres"
-- Semantic info: "The API uses REST, not GraphQL"
-- Learning: "I learned that bun:sqlite is built-in"
-
-### List Injected Memories
-
-To see which memories are currently injected in your prompt, use one of:
-
-```
-list-memories
-list-memory
-show-memory
-```
-
-All three commands are equivalent and display all memories grouped by scope (Global/Project) and store (LTM/STM). Useful for debugging or understanding what the AI remembers about you.
-
-### Delete a Memory
-
-To delete a specific memory from AI Vector Memories, ask your AI assistant mentioning "true-mem" to avoid confusion with other memory plugins:
-
-```
-"Delete the true-mem memory about using bun"
-"Remove from true-mem the memory that says 'always run tests'"
-```
-
-The AI assistant can directly query and update the SQLite database at `~/.ai-vector-memories/memory.db`.
-
-### Generate Metrics Report
-
-You can regenerate a baseline-vs-current metrics report anytime:
-
-```bash
-# markdown to stdout (default)
-bun run metrics:report
-
-# json to stdout
-bun run metrics:report --format json
-
-# write markdown report to file
-bun run metrics:report --output ./metrics-report.md
-```
-
-Supported flags:
-
-- `--format json|markdown` (default: `markdown`)
-- `--output <file>` (default: stdout)
-
-### Explicit Memory Storage
-
-Use phrases like "Remember this:" or "Remember that ..." to force storage:
-
-```
-"Remember this: never commit without running tests first"
-"Remember that I prefer to use TypeScript in my projects"
-```
-
-**Scope Behavior**:
-
-By default, explicit intent memories are stored at **project scope** (only visible in the current project). To make them **global** (available in all projects), include a global scope keyword anywhere in your phrase:
-
-| Language       | Global Scope Keywords                                                          |
-| -------------- | ------------------------------------------------------------------------------ |
-| **English**    | "always", "everywhere", "for all projects", "in every project", "globally"     |
-| **Italian**    | "sempre", "ovunque", "per tutti i progetti", "in ogni progetto", "globalmente" |
-| **Spanish**    | "siempre", "en todas partes", "para todos los proyectos"                       |
-| **French**     | "toujours", "partout", "pour tous les projets"                                 |
-| **German**     | "immer", "überall", "für alle projekte"                                        |
-| **Portuguese** | "sempre", "em todos os projetos"                                               |
-
-**Examples**:
-
-| Memory      | Scope                             | Phrase                                                       |
-| ----------- | --------------------------------- | ------------------------------------------------------------ |
-| **Project** | `project_scope = current_project` | "Remember that we use REST for the API"                      |
-| **Global**  | `project_scope = null`            | "Remember to _always_ run tests before committing"           |
-| **Global**  | `project_scope = null`            | "Remember that I _always_ use Typescript _in every project_" |
-
----
-
-## Advanced: Semantic Embeddings (Experimental)
-
-AI Vector Memories includes an **experimental** NLP embeddings feature that provides semantic similarity search beyond basic Jaccard matching.
-
-### What It Does
-
-When enabled, AI Vector Memories uses a lightweight transformer model (all-MiniLM-L6-v2) to generate 384-dimensional embeddings for each memory. This enables:
-
-- **Semantic retrieval** - Find memories by meaning, not just keyword matching
-- **Better relevance** - Understands that "I like TypeScript" relates to "JavaScript preferences"
-- **Cross-lingual support** - Works across the 15 supported languages
-
-### How It Works
-
-**Architecture:**
-
-```
-Main Thread (Bun) → Node.js Worker Process → Transformers.js v4 → ONNX Runtime
-```
-
-**RuVector references:**
-
-- **RuVector Docs Index**: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
-- **RuVector npm Package README**: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
-
-The plugin spawns a separate Node.js process to run the transformer model in isolation, ensuring Bun stability. The model is automatically downloaded on first use and cached locally.
-
-**Trade-offs:**
-
-- **Storage**: ~23MB for cached model (downloaded once to `~/.ai-vector-memories/models/`)
-- **Memory**: ~200MB RAM when worker is active (during embedding generation)
-- **Init time**: 2-3 seconds on first use (model loading)
-- **Hot-reload resilient**: Debounce (1s) prevents spawn thrashing
-
-### Enabling Embeddings
-
-Edit `~/.ai-vector-memories/config.jsonc` and set:
-
-```jsonc
-{
-  "embeddingsEnabled": 1,
-}
-```
-
-Or use environment variable:
-
-```bash
-export TRUE_MEM_EMBEDDINGS=1
-opencode
-```
-
-To disable, set to `0` or remove the line from config.
-
-### Status
-
-**Experimental** - The feature works well but is still being tested. The Jaccard-only mode (default) is production-stable. When embeddings are enabled, the system gracefully falls back to Jaccard if the worker fails (circuit breaker: 3 failures / 5 minutes).
-
-### Checking If Active
-
-```bash
-# Check config file
-cat ~/.ai-vector-memories/config.jsonc | grep embeddingsEnabled
-
-# Check logs for [embeddings=true] tag
-tail -f ~/.ai-vector-memories/plugin-debug.log | grep "\[embeddings=true\]"
-```
-
----
-
-## Architecture
-
-```
-ai-vector-memories/
-├── src/
-│   ├── index.ts                 # Entry point with fire-and-forget init
-│   ├── state.ts                 # Plugin state management
-│   ├── logger.ts                # File-based debug logging
-│   ├── shutdown.ts              # Graceful shutdown handling
-│   ├── config/
-│   │   ├── config.ts            # JSONC config loading with comments
-│   │   ├── state.ts             # Runtime state persistence
-│   │   ├── migration.ts         # Config migration (v1.2 → v1.3)
-│   │   └── injection-mode.ts    # Injection mode utilities
-│   ├── storage/
-│   │   ├── sqlite-adapter.ts    # bun:sqlite + node:sqlite runtime adapter
-│   │   └── database.ts          # MemoryDatabase class with scope filtering
-│   ├── memory/
-│   │   ├── patterns.ts          # Multilingual patterns (15 languages)
-│   │   ├── negative-patterns.ts # False positive prevention
-│   │   ├── role-patterns.ts     # Role-aware extraction (Human vs Assistant)
-│   │   ├── classifier.ts        # Four-layer defense + role validation
-│   │   ├── embeddings.ts        # Jaccard similarity search
-│   │   ├── embeddings-nlp.ts    # NLP embeddings worker management
-│   │   ├── embedding-worker.ts  # Worker process for transformer model
-│   │   └── reconsolidate.ts     # Conflict resolution
-│   ├── extraction/
-│   │   └── queue.ts             # Fire-and-forget extraction queue
-│   ├── adapters/
-│   │   └── opencode/
-│   │       ├── index.ts         # Full extraction + injection hooks
-│   │       ├── injection.ts     # Memory injection logic
-│   │       └── injection-tracker.ts  # Session injection tracking
-│   └── utils/
-│       ├── version.ts           # Version utilities
-│       ├── jsonc.ts             # JSONC parser with comments
-│       └── toast.ts             # Toast notifications
-└── dist/
-    ├── index.js                 # Bundle (~155KB)
-    └── memory/
-        └── embedding-worker.js  # Worker bundle (~3KB)
-```
-
----
-
-## Memory Classifications
-
-| Type           | Decay    | Store | Scope   | Example                        |
-| -------------- | -------- | ----- | ------- | ------------------------------ |
-| **constraint** | Never    | STM   | Global  | "Never use `var`"              |
-| **preference** | Never    | STM   | Global  | "Prefers functional style"     |
-| **learning**   | Never    | LTM   | Global  | "Learned bun:sqlite API"       |
-| **procedural** | Never    | STM   | Global  | "Run tests before commit"      |
-| **decision**   | Never    | LTM   | Project | "Decided SQLite over Postgres" |
-| **semantic**   | Never    | STM   | Project | "API uses REST, not GraphQL"   |
-| **episodic**   | Yes (7d) | STM   | Project | "Yesterday we refactored auth" |
-
----
-
-## Technical Details
-
-### 7-Feature Scoring Model
-
-| Feature      | Weight | Description                                  |
-| ------------ | ------ | -------------------------------------------- |
-| Recency      | 0.20   | Time since creation (0 = recent, 1 = old)    |
-| Frequency    | 0.15   | Number of accesses (log scale)               |
-| Importance   | 0.25   | Combination of signals (diminishing returns) |
-| Utility      | 0.20   | Usefulness for current task                  |
-| Novelty      | 0.10   | Distance from existing memories              |
-| Confidence   | 0.10   | Consensus of extraction evidence             |
-| Interference | -0.10  | Penalty for conflicts                        |
-
-**Strength Formula**: `Strength = Sum(weight_i * feature_i)` clamped to [0, 1]
-
-### Four-Layer False Positive Prevention
-
-| Layer                             | Purpose                                                                           |
-| --------------------------------- | --------------------------------------------------------------------------------- |
-| 1. Question Detection             | Filter questions before classification                                            |
-| 2. Negative Patterns              | AI meta-talk, list selections, 1st person recall, remind-me recall (10 languages) |
-| 3. Multi-Keyword + Sentence-Level | Require 2+ signals in the same sentence                                           |
-| 4. Confidence Threshold           | Store only if score >= 0.6                                                        |
-
-### Decay Strategy
-
-- **Episodic memories**: Decay using Ebbinghaus formula (lambda = 0.05 STM, 0.01 LTM)
-- **All other types**: Permanent (no decay)
-
----
+### Config Fields
+
+- `injectionMode`
+  - `0`: inject only at session start
+  - `1`: inject on every prompt
+- `subagentMode`
+  - `0`: disable injection in subagents
+  - `1`: enable injection in subagents
+- `embeddingsEnabled`
+  - `0`: Jaccard-only retrieval
+  - `1`: hybrid retrieval with embeddings
+- `maxMemories`
+  - max items injected per prompt
+
+### Environment Variable Overrides
+
+- `TRUE_MEM_INJECTION_MODE`
+- `TRUE_MEM_SUBAGENT_MODE`
+- `TRUE_MEM_EMBEDDINGS`
+- `TRUE_MEM_MAX_MEMORIES`
+
+## Common Commands
+
+- `bun run dev`: watch and rebuild plugin bundle
+- `bun run build`: production build + type declarations + worker bundle
+- `bun run typecheck`: strict TypeScript validation
+- `bun run metrics:injection`: injection metrics snapshot
+- `bun run metrics:report`: baseline/current metrics report
+
+## Architecture at a Glance
+
+- `src/index.ts`: plugin bootstrap, hook registration, fail-open runtime behavior
+- `src/adapters/opencode/`: OpenCode integration and hook handling
+- `src/memory/`: classification, retrieval, reconsolidation, quotas, compression
+- `src/extraction/`: async extraction queue
+- `src/storage/`: SQLite access and persistence logic
+
+Read the full architecture guide: [docs/architecture.md](docs/architecture.md).
+
+## For New Developers
+
+Use this reading order:
+
+1. [docs/index.md](docs/index.md)
+2. [docs/project-overview.md](docs/project-overview.md)
+3. [docs/architecture.md](docs/architecture.md)
+4. [docs/development-guide.md](docs/development-guide.md)
+5. [docs/source-tree-analysis.md](docs/source-tree-analysis.md)
+
+## Troubleshooting
+
+- Plugin appears loaded but no memory injection:
+  - Check `~/.ai-vector-memories/plugin-debug.log`
+  - Confirm `injectionMode` and `maxMemories`
+- Unexpected retrieval behavior:
+  - Verify `embeddingsEnabled` and related model initialization
+  - Inspect reconsolidation and scoring settings in config
+- Build issues:
+  - Run `bun install` again
+  - Run `bun run typecheck` and resolve reported errors first
 
 ## Contributing
 
-Want to contribute or test your own changes? Here's how:
+Contributions are welcome.
 
-1. **Fork this repository**
+- Keep TypeScript strictness intact
+- Preserve fail-open behavior in runtime hooks
+- Keep async heavy work out of transaction blocks
+- Prefer small, focused pull requests
 
-2. **Build the plugin**
+## References
 
-   ```bash
-   cd ai-vector-memories
-   bun install
-   bun run build
-   ```
+- [AGENTS.md](AGENTS.md): repository conventions for coding agents
+- [docs/index.md](docs/index.md): complete documentation map
+- RuVector docs: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
 
-3. **Use your local version** in `~/.config/opencode/opencode.json`:
+## License
 
-   ```json
-   {
-     "plugin": ["file:///path/to/your/fork/ai-vector-memories"]
-   }
-   ```
-
-4. **Restart OpenCode** - it will load your local build instead of the npm version.
-
-5. **Make your changes**, rebuild with `bun run build`, and test.
-
-6. **Submit a PR** when ready!
-
-Inspired by [PsychMem](https://github.com/muratg98/psychmem) - a pioneering plugin for persistent memory in OpenCode and [true-mem](https://github.com/rizal72/true-mem) - a base code repository for memory management. This plugin builds on their foundations with a focus on cognitive psychology principles and robust memory management.
-
----
-
-## Debug
-
-```bash
-# View logs
-tail -f ~/.ai-vector-memories/plugin-debug.log
-
-# Show latest aggregated injection metrics (baseline/current/targets)
-bun run metrics:injection
-
-# Query database
-sqlite3 ~/.ai-vector-memories/memory.db "SELECT classification, summary, strength FROM memory_units WHERE status = 'active' ORDER BY strength DESC LIMIT 10;"
-```
-
----
-
-**License**: MIT
-**Status**: Actively maintained
+MIT. See [LICENSE](LICENSE).

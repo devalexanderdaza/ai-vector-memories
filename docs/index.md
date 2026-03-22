@@ -1,44 +1,31 @@
-# Project Documentation Index
+# Documentation Index
 
-## Project Overview
+This index is the entry point for developers joining the project.
 
-- **Type:** monolith
-- **Primary Language:** TypeScript
-- **Architecture:** Plugin / Library Architecture
+## Recommended Reading Order
 
-## Quick Reference
+1. [Project Overview](./project-overview.md)
+2. [Architecture](./architecture.md)
+3. [Development Guide](./development-guide.md)
+4. [Source Tree Analysis](./source-tree-analysis.md)
+5. [Deployment Guide](./deployment-guide.md)
 
-- **Tech Stack:** TypeScript, Bun, OpenCode SDK, SQLite, ruvector, @huggingface/transformers
-- **Entry Point:** src/index.ts
-- **Architecture Pattern:** Event-driven plugin with embedded SQLite and Vector store
+## At a Glance
 
-## External References
+- Project type: OpenCode plugin package
+- Language: TypeScript (strict mode)
+- Runtime: Bun (primary), Node.js-compatible package output
+- Persistence: SQLite
+- Similarity layer: RuVector + optional embeddings
 
-- **RuVector Docs Index**: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
-- **RuVector npm Package README**: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
+## Core Repository Docs
 
-## Generated Documentation
+- [README](../README.md): quick start and operational basics
+- [AGENTS](../AGENTS.md): coding conventions and agent instructions
+- [CHANGELOG](../CHANGELOG.md): release history
 
-- [Project Overview](./project-overview.md)
-- [Architecture](./architecture.md)
-- [Source Tree Analysis](./source-tree-analysis.md)
-- [Development Guide](./development-guide.md)
-- [Deployment Guide](./deployment-guide.md)
-- [Component Inventory](./component-inventory.md) _(To be generated)_
-- [Data Models](./data-models.md) _(To be generated)_
-- [API Contracts](./api-contracts.md) _(To be generated)_
+## Additional References
 
-## Existing Documentation
-
-- [README.md](../README.md) - Main project documentation and usage.
-- [AGENTS.md](../AGENTS.md) - Rules and context for AI agents interacting with this repo.
-- [CHANGELOG.md](../CHANGELOG.md) - History of releases.
-
-## Getting Started
-
-To begin working on this project:
-
-1. Ensure you have [Bun](https://bun.sh/) installed.
-2. Run `bun install` to install dependencies.
-3. Use `bun run dev` to watch for changes during active development.
-4. Read the [Development Guide](./development-guide.md) for more details.
+- BMAD local reference: [docs/bmad-method/llms-full.txt](./bmad-method/llms-full.txt)
+- RuVector docs index: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
+- RuVector package README: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md

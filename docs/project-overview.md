@@ -2,35 +2,48 @@
 
 ## Purpose
 
-`ai-vector-memories` is a plugin for OpenCode AI designed to provide persistent, cognitive memory capabilities. It enables the AI coding assistant to retain context, user preferences, and project-specific knowledge over long periods, enhancing both short-term context awareness and long-term utility.
+ai-vector-memories adds persistent memory to OpenCode so coding agents can retain useful context across sessions.
 
-## Executive Summary
+The plugin is built to preserve high-value information such as preferences, constraints, and project decisions while minimizing runtime overhead.
 
-This library intercepts interactions and workspace events to store critical information into a local vector database. By mapping relationships and using state-of-the-art NLP embeddings (`@huggingface/transformers`), it allows for fast semantic and similarity searches ([`ruvector`](https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md)) against a SQLite backing store.
+## What the Plugin Does
 
-## Technology Stack Summary
+- Observes relevant chat and tool lifecycle events from OpenCode hooks
+- Extracts memory candidates asynchronously to avoid blocking interactions
+- Stores memory units in SQLite with classification metadata
+- Retrieves and injects scoped memory into future prompts
+- Reconsolidates similar memories to prevent duplication and handle conflicts
 
-| Category         | Technology                                                                                                              |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Runtime          | Bun / Node.js                                                                                                           |
-| Language         | TypeScript                                                                                                              |
-| Memory/Vector    | [`ruvector`](https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md), `@huggingface/transformers` |
-| Database         | SQLite                                                                                                                  |
-| Host Integration | `@opencode-ai/plugin` SDK                                                                                               |
+## Key Product Characteristics
 
-## External References
+- Persistent by design: memory survives restarts
+- Scope-aware: supports global and project boundaries
+- Robust retrieval: lexical plus optional embedding-assisted similarity
+- Configurable behavior: injection mode, memory limits, and feature flags
+- Fail-open runtime: plugin logs errors and continues when safe
 
-- **RuVector Docs Index**: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
-- **RuVector npm Package README**: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
+## Primary Users
 
-## Architecture Type
+- Developers using OpenCode in medium-to-long coding sessions
+- Teams that want assistants to remember coding conventions and decisions
 
-- **Monolith**: Single cohesive TypeScript project exporting an ESM plugin.
-- **Pattern**: Event-driven plugin architecture with background worker processing.
+## Non-Goals
 
-## Quick Links
+- Replacing source control history
+- Replacing formal architecture decision records
+- Acting as a full vector database service outside the plugin context
 
-- [Architecture Document](./architecture.md)
-- [Source Tree Analysis](./source-tree-analysis.md)
+## Tech Stack Summary
+
+- Language: TypeScript
+- Runtime/build: Bun
+- Plugin SDK: @opencode-ai/plugin, @opencode-ai/sdk
+- Database: SQLite
+- Similarity/vector layer: ruvector
+- Optional NLP embeddings: @huggingface/transformers
+
+## Where to Go Next
+
+- [Architecture](./architecture.md)
 - [Development Guide](./development-guide.md)
-- [Deployment Guide](./deployment-guide.md)
+- [Source Tree Analysis](./source-tree-analysis.md)

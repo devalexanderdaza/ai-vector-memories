@@ -1,43 +1,94 @@
-# Architecture Document
+# Architecture
 
-## Executive Summary
+## System Summary
 
-This project (`ai-vector-memories`) is an OpenCode AI plugin that provides persistent, cognitive memory capabilities to coding assistants. It allows the assistant to store and retrieve semantic memories over time, enhancing context awareness and overall performance.
+ai-vector-memories is an event-driven OpenCode plugin. It registers hooks early, initializes lightweight dependencies fast, and processes heavier memory work asynchronously.
 
-## Technology Stack
+## Design Goals
 
-- **Language**: TypeScript
-- **Runtime**: Bun (also compatible with Node.js)
-- **SDK**: OpenCode Plugin SDK (`@opencode-ai/plugin`, `@opencode-ai/sdk`)
-- **Memory & Embeddings**: [`ruvector`](https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md) (Vector Store), `@huggingface/transformers` (NLP Embeddings)
-- **Database**: SQLite (via `src/storage/sqlite-adapter.ts`)
+- Keep host interactions responsive
+- Preserve memory quality over time
+- Avoid cross-project memory leakage
+- Fail open on recoverable runtime errors
 
-## Architecture Pattern
+## Runtime Flow
 
-**Plugin / Modular Library Architecture**
-The system is built as a plugin that attaches to the OpenCode host via hooks. It operates in an event-driven manner, intercepting chats, workspace events, and processing them asynchronously using an internal worker/queue system to prevent blocking the host UI.
+1. Plugin entrypoint registers hooks immediately.
+2. Initialization sets up config, storage, and retrieval services.
+3. Hook events trigger extraction/retrieval logic.
+4. Retrieval pipeline selects scoped memories and injects them.
+5. Background processing updates memory stores and metrics.
 
-## Component Overview
+## Main Components
 
-- **Adapter Layer (`src/adapters/opencode/`)**: Interfaces with the OpenCode API. Handles injection tracking, and chat lifecycle hooks.
-- **Memory Layer (`src/memory/`)**: Core logic for generating embeddings via Hugging Face models, classifying text, matching patterns, and reconsolidating memories using a local RuVector database.
-- **Storage Layer (`src/storage/`)**: Abstracts SQLite interactions. Handles connection, transaction management, and the raw querying of memories.
-- **Extraction Layer (`src/extraction/`)**: Implements an asynchronous queue to safely process memory extractions in the background.
+### Plugin Bootstrap
 
-## Data Architecture
+- Path: src/index.ts
+- Responsibilities:
+  - initialize plugin state
+  - guard hot reload behavior
+  - delegate to adapter hooks
+  - enforce non-blocking and fail-open patterns
 
-- **SQLite Database**: Stores memory units. A custom `sqlite-adapter` abstracts the SQL dialect to work across runtimes like Bun and Node.js.
-- **Vectors**: Uses [`ruvector`](https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md) for embedding arrays and performing similarity search (cosine similarity / Euclidean distance) to fetch relevant context on subsequent prompts.
+### Adapter Layer
 
-## External References
+- Path: src/adapters/opencode/
+- Responsibilities:
+  - OpenCode hook integration
+  - chat and tool lifecycle wiring
+  - filtering to avoid memory self-ingestion
 
-- **RuVector documentation index**: https://github.com/ruvnet/RuVector/blob/main/docs/INDEX.md
-- **RuVector npm package README**: https://github.com/ruvnet/RuVector/blob/main/npm/packages/ruvector/README.md
+### Memory Layer
 
-## Development Workflow
+- Path: src/memory/
+- Responsibilities:
+  - classification and scoring
+  - retrieval ranking
+  - reconsolidation decisions
+  - optional compression
+  - adaptive quota behavior
+  - metrics collection and reporting
 
-Development is managed using Bun. Core commands include `bun run dev` for watching and building, and `bun run typecheck` for validating TypeScript definitions.
+### Extraction Queue
 
-## Deployment Architecture
+- Path: src/extraction/queue.ts
+- Responsibilities:
+  - asynchronous extraction scheduling
+  - backpressure-friendly processing
 
-The output is bundled via Bun into the `dist/` folder (ESM format). A separate worker bundle is built for `dist/memory/embedding-worker.js` to ensure heavy NLP tasks do not stall the main thread. It is published as an npm package via GitHub Actions (`release.yml`).
+### Storage Layer
+
+- Path: src/storage/
+- Responsibilities:
+  - SQLite access and persistence
+  - transaction-safe operations
+  - memory query primitives
+
+## Data and Retrieval Strategy
+
+- SQLite stores memory units and metadata
+- Lexical similarity (Jaccard) provides fast baseline retrieval
+- Optional embeddings add semantic matching for hybrid search
+- Reconsolidation classifies new information as:
+  - duplicate
+  - conflict
+  - complement
+
+## Operational Safety Rules
+
+- Keep async heavy work outside transaction blocks
+- Roll back transactions on errors
+- Use file logging instead of console output
+- Continue gracefully on non-critical failures
+
+## Build and Artifact Model
+
+- Plugin bundle: dist/index.js
+- Type declarations: dist/index.d.ts
+- Worker bundle: dist/memory/embedding-worker.js
+
+## Related Docs
+
+- [Project Overview](./project-overview.md)
+- [Development Guide](./development-guide.md)
+- [Source Tree Analysis](./source-tree-analysis.md)

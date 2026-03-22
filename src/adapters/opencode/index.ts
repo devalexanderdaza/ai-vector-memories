@@ -48,7 +48,7 @@ import {
 } from "./injection.js";
 import { getVersion } from "../../utils/version.js";
 import { EmbeddingService } from "../../memory/embeddings-nlp.js";
-import { getEmbeddingsEnabled } from "../../config/state.js";
+import { getRuntimeEmbeddingsEnabled } from "../../config/state.js";
 import { InjectionMetricsCollector } from "../../memory/injection-metrics.js";
 import {
   markSessionCreated,
@@ -174,7 +174,9 @@ function canExtract(): boolean {
  * Uses config/state and requires an initialized embedding worker.
  */
 function isEmbeddingsActive(): boolean {
-  return getEmbeddingsEnabled() && EmbeddingService.getInstance().isEnabled();
+  return (
+    getRuntimeEmbeddingsEnabled() && EmbeddingService.getInstance().isEnabled()
+  );
 }
 
 function estimateInjectionTokens(memories: MemoryUnit[]): number {

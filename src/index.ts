@@ -14,7 +14,7 @@ import { log } from './logger.js';
 import { getVersion } from './utils/version.js';
 import { showToast } from './utils/toast.js';
 import { EmbeddingService } from './memory/embeddings-nlp.js';
-import { getEmbeddingsEnabled } from './config/state.js';
+import { getRuntimeEmbeddingsEnabled } from './config/state.js';
 import { RuVectorService } from './memory/ruvector-service.js';
 
 // Singleton state - shared across all hook calls
@@ -88,7 +88,7 @@ const TrueMemory: Plugin = async (ctx) => {
         state.initialized = true;
 
         // Initialize NLP embeddings if feature flag is enabled
-        const embeddingsEnabled = getEmbeddingsEnabled();
+        const embeddingsEnabled = getRuntimeEmbeddingsEnabled();
         
         if (embeddingsEnabled) {
           log('Embeddings enabled, initializing...');

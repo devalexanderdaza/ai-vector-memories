@@ -99,6 +99,16 @@ export function getEmbeddingsEnabled(): boolean {
 }
 
 /**
+ * Single runtime source of truth for embeddings feature flag.
+ *
+ * Use this accessor instead of reading env/config/state directly
+ * in hooks or services.
+ */
+export function getRuntimeEmbeddingsEnabled(): boolean {
+  return getEmbeddingsEnabled();
+}
+
+/**
  * Gets the absolute path to Node.js binary with hot-reload resilience.
  * 
  * Flow:

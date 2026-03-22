@@ -112,61 +112,68 @@ interface SelectionTelemetry {
     project: number;
   };
   classifications: Record<string, number>;
+  // Latency of memory selection in milliseconds
+  latencyMs: number;
 }
 
 function buildSelectionTelemetry(params: {
-  worktree: string;
-  selectedMemories: MemoryUnit[];
-  allMemories: MemoryUnit[];
-  embeddingsEnabled: boolean;
-  queryContext: string;
-  mode: SelectionMode;
-  totalTokens: number;
-  maxTokens: number;
-  maxMemories: number;
-}): SelectionTelemetry {
-  const classificationCounts: Record<string, number> = {};
-  let globalCount = 0;
-  let projectCount = 0;
+    worktree: string;
+    selectedMemories: MemoryUnit[];
+    allMemories: MemoryUnit[];
+    embeddingsEnabled: boolean;
+    queryContext: string;
+    mode: SelectionMode;
+    totalTokens: number;
+    maxTokens: number;
+    maxMemories: number;
+    latencyMs: number;
+  }): SelectionTelemetry {
+    const classificationCounts: Record<string, number> = {};
+    let globalCount = 0;
+    let projectCount = 0;
 
-  for (const memory of params.selectedMemories) {
-    classificationCounts[memory.classification] =
-      (classificationCounts[memory.classification] ?? 0) + 1;
+    for (const memory of params.selectedMemories) {
+      classificationCounts[memory.classification] =
+        (classificationCounts[memory.classification] ?? 0) + 1;
 
-    if (memory.projectScope === null) {
-      globalCount++;
-    } else {
-      projectCount++;
+      if (memory.projectScope === null) {
+        globalCount++;
+      } else {
+        projectCount++;
+      }
     }
+
+    const tokenPercent =
+      params.maxTokens > 0
+        ? Math.min(100, Math.round((params.totalTokens / params.maxTokens) * 100))
+        : 0;
+
+    // Safely get queryContext length, defaulting to 0 if null/undefined
+    const queryContextLength = params.queryContext ? params.queryContext.length : 0;
+
+    return {
+      worktree: params.worktree,
+      selected: params.selectedMemories.length,
+      pool: params.allMemories.length,
+      embeddingsEnabled: params.embeddingsEnabled,
+      queryContextLength,
+      mode: params.mode,
+      limits: {
+        maxMemories: params.maxMemories,
+        maxTokens: params.maxTokens,
+      },
+      tokens: {
+        used: params.totalTokens,
+        percent: tokenPercent,
+      },
+      scope: {
+        global: globalCount,
+        project: projectCount,
+      },
+      classifications: classificationCounts,
+      latencyMs: params.latencyMs,
+    };
   }
-
-  const tokenPercent =
-    params.maxTokens > 0
-      ? Math.min(100, Math.round((params.totalTokens / params.maxTokens) * 100))
-      : 0;
-
-  return {
-    worktree: params.worktree,
-    selected: params.selectedMemories.length,
-    pool: params.allMemories.length,
-    embeddingsEnabled: params.embeddingsEnabled,
-    queryContextLength: params.queryContext.length,
-    mode: params.mode,
-    limits: {
-      maxMemories: params.maxMemories,
-      maxTokens: params.maxTokens,
-    },
-    tokens: {
-      used: params.totalTokens,
-      percent: tokenPercent,
-    },
-    scope: {
-      global: globalCount,
-      project: projectCount,
-    },
-    classifications: classificationCounts,
-  };
-}
 
 /**
  * Wrap memories in XML format with persona boundary
@@ -305,23 +312,29 @@ export function extractProjectContext(memories: MemoryUnit[]): MemoryUnit[] {
  * Tier 3: semantic, episodic (low priority, by query relevance)
  */
 export async function selectMemoriesForInjection(
-  db: MemoryDatabase,
-  worktree: string,
-  queryContext: string,
-  embeddingsEnabled: boolean,
-  maxMemories: number = 20,
-  maxTokens: number = 4000,
-): Promise<MemoryUnit[]> {
-  const memories: MemoryUnit[] = [];
-  const selectedIds = new Set<string>();
-  let totalTokens = 0;
-  let selectionMode: SelectionMode = "none";
+   db: MemoryDatabase,
+   worktree: string,
+   queryContext: string,
+   embeddingsEnabled: boolean,
+   maxMemories: number = 20,
+   maxTokens: number = 4000,
+ ): Promise<MemoryUnit[]> {
+   const startTime = Date.now();
+   const memories: MemoryUnit[] = [];
+   const selectedIds = new Set<string>();
+   let totalTokens = 0;
+   let selectionMode: SelectionMode = "none";
 
   // Scale quotas proportionally
   const MIN_GLOBAL = Math.floor(maxMemories * 0.3);
   const MIN_PROJECT = Math.floor(maxMemories * 0.3);
   const MAX_FLEXIBLE = maxMemories - MIN_GLOBAL - MIN_PROJECT;
   const MAX_CONSTRAINTS = 10;
+
+  // Validate worktree parameter
+  if (!worktree || worktree.trim() === '') {
+    throw new Error('Invalid worktree parameter');
+  }
 
   // Step 1: Get all memories
   const allMemories = db.getMemoriesByScope(worktree, 100);
@@ -454,18 +467,48 @@ export async function selectMemoriesForInjection(
     );
   }
 
-  const telemetry = buildSelectionTelemetry({
-    worktree,
-    selectedMemories: memories,
-    allMemories,
-    embeddingsEnabled,
-    queryContext,
-    mode: selectionMode,
-    totalTokens,
-    maxTokens,
-    maxMemories,
-  });
-  log(`Selection telemetry: ${JSON.stringify(telemetry)}`);
+let telemetry;
+      const latencyMs = Date.now() - startTime;
+      try {
+        telemetry = buildSelectionTelemetry({
+          worktree,
+          selectedMemories: memories,
+          allMemories,
+          embeddingsEnabled,
+          queryContext,
+          mode: selectionMode,
+          totalTokens,
+          maxTokens,
+          maxMemories,
+          latencyMs,
+        });
+      } catch (error) {
+        // Provide minimal telemetry to maintain fail-open behavior
+        telemetry = {
+          worktree,
+          selected: memories.length,
+          allMemories: allMemories ? allMemories.length : 0,
+          embeddingsEnabled,
+          queryContextLength: queryContext ? queryContext.length : 0,
+          mode: selectionMode,
+          totalTokens,
+          maxTokens,
+          maxMemories,
+          latencyMs,
+        };
+        // Try to log the error, but don't let logging errors affect the telemetry
+        try {
+          log(`Error building selection telemetry: ${error instanceof Error ? error.message : String(error)}`);
+        } catch (loggingError) {
+          // If logging fails, we ignore it to maintain fail-open
+        }
+      }
+      // Log the telemetry, but don't let logging errors affect the return value
+      try {
+        log(`Selection telemetry: ${JSON.stringify(telemetry)}`);
+      } catch (loggingError) {
+        // If logging fails, we ignore it to maintain fail-open
+      }
 
   return memories;
 }

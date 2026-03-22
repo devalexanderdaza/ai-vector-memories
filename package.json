@@ -1,7 +1,21 @@
 {
   "name": "ai-vector-memories",
   "version": "0.0.1",
-  "description": "A plugin for OpenCode AI that provides persistent, cognitive memory capabilities to enhance the coding assistant's performance and user experience.",
+  "description": "AI Vector Memories is an open-source library that provides a powerful and efficient way to manage and utilize vector-based memories for AI applications. It offers a simple API for storing, retrieving, and manipulating high-dimensional vector representations of data, enabling developers to build intelligent systems that can learn from and reason about complex information.",
+  "authors": [
+    {
+      "name": "Alexander Daza",
+      "email": "dev.alexander.daza@gmail.com",
+      "url": "https://github.com/devalexanderdaza"
+    }
+  ],
+  "contributors": [
+    {
+      "name": "Alexander Daza",
+      "email": "dev.alexander.daza@gmail.com",
+      "url": "https://github.com/devalexanderdaza"
+    }
+  ],
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",

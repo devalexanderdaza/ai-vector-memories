@@ -452,6 +452,9 @@ Inspired by [PsychMem](https://github.com/muratg98/psychmem) - a pioneering plug
 # View logs
 tail -f ~/.ai-vector-memories/plugin-debug.log
 
+# Show latest aggregated injection metrics (baseline/current/targets)
+bun run metrics:injection
+
 # Query database
 sqlite3 ~/.ai-vector-memories/memory.db "SELECT classification, summary, strength FROM memory_units WHERE status = 'active' ORDER BY strength DESC LIMIT 10;"
 ```

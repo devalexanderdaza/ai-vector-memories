@@ -15,7 +15,8 @@
     "preversion": "bun run build",
     "build": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly && bun build src/memory/embedding-worker.ts --outdir dist/memory --target bun --format esm",
     "dev": "bun build src/index.ts --outdir dist --target bun --format esm --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "metrics:injection": "bun run scripts/metrics-injection-report.ts"
   },
   "keywords": [
     "opencode",

@@ -685,6 +685,8 @@ export async function createTrueMemoryPlugin(
             tokensUsed: injectionTelemetry.tokens.used,
             tokenUsagePercent: injectionTelemetry.tokens.percent,
             embeddingsEnabled,
+            compressionEvents: 0,
+            tokensSavedByCompression: 0,
           });
         } catch (metricsError) {
           log(

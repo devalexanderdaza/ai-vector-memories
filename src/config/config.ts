@@ -15,8 +15,8 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { log } from '../logger.js';
-import type { TrueMemUserConfig, InjectionMode, SubAgentMode } from '../types/config.js';
-import { DEFAULT_USER_CONFIG } from '../types/config.js';
+import type { TrueMemUserConfig, InjectionMode, SubAgentMode, CompressionConfig } from '../types/config.js';
+import { DEFAULT_USER_CONFIG, DEFAULT_COMPRESSION_CONFIG } from '../types/config.js';
 import { parseJsonc } from '../utils/jsonc.js';
 
 const CONFIG_DIR = join(homedir(), '.ai-vector-memories');
@@ -88,6 +88,40 @@ function validateEmbeddingsEnabled(value: unknown): number {
 }
 
 /**
+ * Parse compression config from env var (TRUE_MEM_COMPRESSION_ENABLED)
+ */
+function parseCompressionEnabled(envValue: string | undefined): boolean {
+  if (!envValue) return DEFAULT_COMPRESSION_CONFIG.enabled;
+  const parsed = envValue.trim().toLowerCase();
+  if (parsed === '1' || parsed === 'true') return true;
+  if (parsed === '0' || parsed === 'false') return false;
+  log(`Config: Invalid TRUE_MEM_COMPRESSION_ENABLED: ${envValue}, using default`);
+  return DEFAULT_COMPRESSION_CONFIG.enabled;
+}
+
+/**
+ * Validate compression config from file config
+ */
+function validateCompressionConfig(value: unknown): CompressionConfig {
+  if (typeof value !== 'object' || value === null) {
+    return DEFAULT_COMPRESSION_CONFIG;
+  }
+  const cfg = value as Record<string, unknown>;
+  const enabled = typeof cfg.enabled === 'boolean' ? cfg.enabled : DEFAULT_COMPRESSION_CONFIG.enabled;
+  const maxRatioRaw = cfg.maxCompressionRatio;
+  const maxRatio = (typeof maxRatioRaw === 'number' && isFinite(maxRatioRaw))
+    ? Math.max(0, Math.min(1, maxRatioRaw))
+    : DEFAULT_COMPRESSION_CONFIG.maxCompressionRatio;
+  const minLen = typeof cfg.minSummaryLength === 'number'
+    ? Math.max(0, cfg.minSummaryLength)
+    : DEFAULT_COMPRESSION_CONFIG.minSummaryLength;
+  const excludedTiers = Array.isArray(cfg.excludedTiers)
+    ? cfg.excludedTiers.filter((t): t is number => typeof t === 'number')
+    : DEFAULT_COMPRESSION_CONFIG.excludedTiers;
+  return { enabled, maxCompressionRatio: maxRatio, minSummaryLength: minLen, excludedTiers };
+}
+
+/**
  * Parse embeddings enabled from env or return default
  * Returns 0 or 1 (number for JSONC config compatibility)
  */
@@ -133,6 +167,13 @@ export function loadConfig(): TrueMemUserConfig {
   const envSubagentMode = process.env.TRUE_MEM_SUBAGENT_MODE;
   const envMaxMemories = process.env.TRUE_MEM_MAX_MEMORIES;
   const envEmbeddingsEnabled = process.env.TRUE_MEM_EMBEDDINGS;
+  const envCompressionEnabled = process.env.TRUE_MEM_COMPRESSION_ENABLED;
+
+  const fileCompression = fileConfig.compression ? validateCompressionConfig(fileConfig.compression) : DEFAULT_COMPRESSION_CONFIG;
+  const compressionEnabledFromEnv = parseCompressionEnabled(envCompressionEnabled);
+  const compression: CompressionConfig = compressionEnabledFromEnv !== DEFAULT_COMPRESSION_CONFIG.enabled
+    ? { ...fileCompression, enabled: compressionEnabledFromEnv }
+    : fileCompression;
 
   const config: TrueMemUserConfig = {
     injectionMode: envInjectionMode !== undefined
@@ -147,10 +188,11 @@ export function loadConfig(): TrueMemUserConfig {
     embeddingsEnabled: envEmbeddingsEnabled !== undefined
       ? parseEmbeddingsEnabled(envEmbeddingsEnabled)
       : validateEmbeddingsEnabled(fileConfig.embeddingsEnabled),
+    compression,
   };
   
   // Log the final config
-  log(`Config: injectionMode=${config.injectionMode}, subagentMode=${config.subagentMode}, maxMemories=${config.maxMemories}, embeddingsEnabled=${config.embeddingsEnabled}`);
+  log(`Config: injectionMode=${config.injectionMode}, subagentMode=${config.subagentMode}, maxMemories=${config.maxMemories}, embeddingsEnabled=${config.embeddingsEnabled}, compression.enabled=${config.compression.enabled}`);
   
   return config;
 }
@@ -162,15 +204,30 @@ export function generateConfigWithComments(config: TrueMemUserConfig): string {
   return `{
   // Injection mode: 0 = session start only (recommended), 1 = every prompt
   "injectionMode": ${config.injectionMode},
-  
+
   // Sub-agent mode: 0 = disabled, 1 = enabled (default)
   "subagentMode": ${config.subagentMode},
-  
+
   // Embeddings: 0 = Jaccard similarity only, 1 = hybrid (Jaccard + embeddings)
   "embeddingsEnabled": ${config.embeddingsEnabled},
-  
+
   // Maximum memories to inject per prompt (10-50 recommended)
-  "maxMemories": ${config.maxMemories}
+  "maxMemories": ${config.maxMemories},
+
+  // Compression settings for low-priority memory summaries
+  "compression": {
+    // Enable compression: true = enabled, false = disabled (default)
+    "enabled": ${config.compression.enabled},
+
+    // Max compression ratio: 0.0-1.0 (e.g. 0.5 = keep 50% of summary)
+    "maxCompressionRatio": ${config.compression.maxCompressionRatio},
+
+    // Minimum characters to preserve after compression
+    "minSummaryLength": ${config.compression.minSummaryLength},
+
+    // Tiers excluded from compression (Tier 0=constraint, Tier 1=preference/decision)
+    "excludedTiers": [${config.compression.excludedTiers.join(', ')}]
+  }
 }`;
 }
 
@@ -219,4 +276,11 @@ export function getMaxMemories(): number {
  */
 export function getEmbeddingsEnabledFromConfig(): number {
   return loadConfig().embeddingsEnabled;
+}
+
+/**
+ * Get compression config (convenience function)
+ */
+export function getCompressionConfig(): CompressionConfig {
+  return loadConfig().compression;
 }

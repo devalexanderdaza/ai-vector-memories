@@ -8,6 +8,9 @@ import type { MemoryDatabase } from "../../storage/database.js";
 import { jaccardSimilarity } from "../../memory/embeddings.js";
 import { USER_LEVEL_CLASSIFICATIONS } from "../../types.js";
 import { log } from "../../logger.js";
+import { applyCompression } from "../../memory/compression.js";
+import { getCompressionConfig } from "../../config/config.js";
+import { InjectionMetricsCollector } from "../../memory/injection-metrics.js";
 
 /**
  * Adapter state interface for injection operations
@@ -465,6 +468,31 @@ export async function selectMemoriesForInjection(
     log(
       `Fallback selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`,
     );
+  }
+
+  const compressionConfig = getCompressionConfig();
+  if (compressionConfig.enabled) {
+    try {
+      const { memories: compressedMemories, tokensSaved } = applyCompression(
+        memories,
+        totalTokens,
+        maxTokens,
+        compressionConfig,
+      );
+      if (tokensSaved > 0) {
+        totalTokens = compressedMemories.reduce((sum, m) => sum + estimateMemoryTokens(m), 0);
+        memories.length = 0;
+        memories.push(...compressedMemories);
+        log(`Compression applied: saved ${tokensSaved} tokens, final ${memories.length} memories`);
+        try {
+          InjectionMetricsCollector.getInstance().recordCompression(tokensSaved);
+        } catch (metricsErr) {
+          log(`Compression metrics failed: ${metricsErr instanceof Error ? metricsErr.message : String(metricsErr)}`);
+        }
+      }
+    } catch (err) {
+      log(`Compression failed, using original selection: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
 let telemetry;

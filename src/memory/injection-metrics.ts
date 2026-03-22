@@ -13,6 +13,8 @@ export interface InjectionMetricsRecord {
   tokensUsed: number;
   tokenUsagePercent: number;
   embeddingsEnabled: boolean;
+  compressionEvents: number;
+  tokensSavedByCompression: number;
 }
 
 interface MetricsSnapshot {
@@ -22,6 +24,9 @@ interface MetricsSnapshot {
   avgSelectedMemories: number;
   avgTokensUsed: number;
   avgTokenUsagePercent: number;
+  totalCompressionEvents: number;
+  totalTokensSavedByCompression: number;
+  avgTokensSavedByCompression: number;
 }
 
 interface TargetEvaluation {
@@ -63,6 +68,8 @@ function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
   const selected = records.map((record) => record.selectedMemories);
   const tokens = records.map((record) => record.tokensUsed);
   const tokenPercents = records.map((record) => record.tokenUsagePercent);
+  const compressionEvents = records.map((record) => record.compressionEvents);
+  const tokensSaved = records.map((record) => record.tokensSavedByCompression);
 
   return {
     samples: records.length,
@@ -71,6 +78,9 @@ function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
     avgSelectedMemories: Number(average(selected).toFixed(2)),
     avgTokensUsed: Number(average(tokens).toFixed(2)),
     avgTokenUsagePercent: Number(average(tokenPercents).toFixed(2)),
+    totalCompressionEvents: compressionEvents.reduce((sum, v) => sum + v, 0),
+    totalTokensSavedByCompression: tokensSaved.reduce((sum, v) => sum + v, 0),
+    avgTokensSavedByCompression: Number(average(tokensSaved).toFixed(2)),
   };
 }
 
@@ -135,6 +145,14 @@ export class InjectionMetricsCollector {
     if (this.totalInjections % SUMMARY_EVERY === 0) {
       const summary = this.getSummary();
       log(`Injection metrics summary: ${JSON.stringify(summary)}`);
+    }
+  }
+
+  recordCompression(tokensSaved: number): void {
+    const latest = this.records[this.records.length - 1];
+    if (latest) {
+      latest.compressionEvents += 1;
+      latest.tokensSavedByCompression += tokensSaved;
     }
   }
 

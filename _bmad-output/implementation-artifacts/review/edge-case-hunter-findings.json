@@ -1,0 +1,26 @@
+[
+  {
+    "location": "src/adapters/opencode/injection.ts:462-492",
+    "trigger_condition": "worktree parameter is null or undefined",
+    "guard_snippet": "if (!worktree) { throw new Error('worktree is required'); }",
+    "potential_consequence": "Runtime error when accessing worktree property"
+  },
+  {
+    "location": "src/adapters/opencode/injection.ts:482",
+    "trigger_condition": "allMemories is null in error handling path",
+    "guard_snippet": "allMemories?.length ?? 0",
+    "potential_consequence": "TypeError: Cannot read property 'length' of null"
+  },
+  {
+    "location": "src/adapters/opencode/injection.ts:484",
+    "trigger_condition": "queryContext is null or undefined",
+    "guard_snippet": "(queryContext ?? '').length",
+    "potential_consequence": "TypeError: Cannot read property 'length' of null"
+  },
+  {
+    "location": "src/adapters/opencode/injection.ts:145-148",
+    "trigger_condition": "maxTokens is zero causing division by zero",
+    "guard_snippet": "params.maxTokens !== 0 ? ... : 0",
+    "potential_consequence": "Infinity or NaN in token percent calculation"
+  }
+]

@@ -32,6 +32,84 @@ export interface InjectionState {
  */
 export type InjectionType = "user" | "project" | "global";
 
+type SelectionMode = "dynamic" | "fallback" | "none";
+
+interface SelectionTelemetry {
+  worktree: string;
+  selected: number;
+  pool: number;
+  embeddingsEnabled: boolean;
+  queryContextLength: number;
+  mode: SelectionMode;
+  limits: {
+    maxMemories: number;
+    maxTokens: number;
+  };
+  tokens: {
+    used: number;
+    percent: number;
+  };
+  scope: {
+    global: number;
+    project: number;
+  };
+  classifications: Record<string, number>;
+}
+
+function buildSelectionTelemetry(params: {
+  worktree: string;
+  selectedMemories: MemoryUnit[];
+  allMemories: MemoryUnit[];
+  embeddingsEnabled: boolean;
+  queryContext: string;
+  mode: SelectionMode;
+  totalTokens: number;
+  maxTokens: number;
+  maxMemories: number;
+}): SelectionTelemetry {
+  const classificationCounts: Record<string, number> = {};
+  let globalCount = 0;
+  let projectCount = 0;
+
+  for (const memory of params.selectedMemories) {
+    classificationCounts[memory.classification] =
+      (classificationCounts[memory.classification] ?? 0) + 1;
+
+    if (memory.projectScope === null) {
+      globalCount++;
+    } else {
+      projectCount++;
+    }
+  }
+
+  const tokenPercent =
+    params.maxTokens > 0
+      ? Math.min(100, Math.round((params.totalTokens / params.maxTokens) * 100))
+      : 0;
+
+  return {
+    worktree: params.worktree,
+    selected: params.selectedMemories.length,
+    pool: params.allMemories.length,
+    embeddingsEnabled: params.embeddingsEnabled,
+    queryContextLength: params.queryContext.length,
+    mode: params.mode,
+    limits: {
+      maxMemories: params.maxMemories,
+      maxTokens: params.maxTokens,
+    },
+    tokens: {
+      used: params.totalTokens,
+      percent: tokenPercent,
+    },
+    scope: {
+      global: globalCount,
+      project: projectCount,
+    },
+    classifications: classificationCounts,
+  };
+}
+
 /**
  * Wrap memories in XML format with persona boundary
  *
@@ -172,6 +250,7 @@ export async function selectMemoriesForInjection(
   const memories: MemoryUnit[] = [];
   const selectedIds = new Set<string>();
   let totalTokens = 0;
+  let selectionMode: SelectionMode = "none";
 
   // Scale quotas proportionally
   const MIN_GLOBAL = Math.floor(maxMemories * 0.3);
@@ -255,6 +334,7 @@ export async function selectMemoriesForInjection(
     embeddingsEnabled &&
     queryContext.trim().length > 0
   ) {
+    selectionMode = "dynamic";
     const relevant = await db.vectorSearch(
       queryContext,
       worktree,
@@ -270,6 +350,7 @@ export async function selectMemoriesForInjection(
       `Dynamic selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`,
     );
   } else if (remainingSlots > 0) {
+    selectionMode = "fallback";
     const remaining = allMemories
       .filter((m) => !selectedIds.has(m.id))
       .sort((a, b) => b.strength - a.strength)
@@ -283,6 +364,19 @@ export async function selectMemoriesForInjection(
       `Fallback selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`,
     );
   }
+
+  const telemetry = buildSelectionTelemetry({
+    worktree,
+    selectedMemories: memories,
+    allMemories,
+    embeddingsEnabled,
+    queryContext,
+    mode: selectionMode,
+    totalTokens,
+    maxTokens,
+    maxMemories,
+  });
+  log(`Selection telemetry: ${JSON.stringify(telemetry)}`);
 
   return memories;
 }

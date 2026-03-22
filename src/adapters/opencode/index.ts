@@ -176,6 +176,72 @@ function isEmbeddingsActive(): boolean {
   return getEmbeddingsEnabled() && EmbeddingService.getInstance().isEnabled();
 }
 
+function estimateInjectionTokens(memories: MemoryUnit[]): number {
+  const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
+
+  return memories.reduce((total, memory) => {
+    const storeLabel = memory.store === "ltm" ? "LTM" : "STM";
+    const xmlEnvelope = `<memory classification="${memory.classification}" store="${storeLabel}" strength="${memory.strength.toFixed(2)}"></memory>`;
+    return (
+      total + estimateTokens(memory.summary) + estimateTokens(xmlEnvelope) + 8
+    );
+  }, 0);
+}
+
+function buildInjectionTelemetry(params: {
+  memories: MemoryUnit[];
+  worktree: string;
+  sessionId?: string;
+  injectionMode: number;
+  embeddingsEnabled: boolean;
+  maxMemories: number;
+  maxTokens: number;
+  selectionLatencyMs: number;
+}): Record<string, unknown> {
+  const classificationCounts: Record<string, number> = {};
+  let globalCount = 0;
+  let projectCount = 0;
+
+  for (const memory of params.memories) {
+    classificationCounts[memory.classification] =
+      (classificationCounts[memory.classification] ?? 0) + 1;
+
+    if (memory.projectScope === null) {
+      globalCount++;
+    } else {
+      projectCount++;
+    }
+  }
+
+  const usedTokens = estimateInjectionTokens(params.memories);
+  const tokenUsagePercent =
+    params.maxTokens > 0
+      ? Math.min(100, Math.round((usedTokens / params.maxTokens) * 100))
+      : 0;
+
+  return {
+    worktree: params.worktree,
+    sessionIdPrefix: params.sessionId ? params.sessionId.slice(0, 8) : null,
+    injectionMode: params.injectionMode,
+    embeddingsEnabled: params.embeddingsEnabled,
+    selectedMemories: params.memories.length,
+    selectionLatencyMs: params.selectionLatencyMs,
+    limits: {
+      maxMemories: params.maxMemories,
+      maxTokens: params.maxTokens,
+    },
+    tokens: {
+      used: usedTokens,
+      percent: tokenUsagePercent,
+    },
+    scope: {
+      global: globalCount,
+      project: projectCount,
+    },
+    classifications: classificationCounts,
+  };
+}
+
 // Message container type matching SDK response
 interface MessageContainer {
   info: Message;
@@ -559,6 +625,8 @@ export async function createTrueMemoryPlugin(
         // Use runtime config source of truth for embeddings.
         const embeddingsEnabled = isEmbeddingsActive();
 
+        const selectionStart = Date.now();
+
         // Use smart selection instead of getMemoriesByScope
         const allMemories = await selectMemoriesForInjection(
           state.db,
@@ -568,6 +636,19 @@ export async function createTrueMemoryPlugin(
           state.config.maxMemories,
           state.config.maxTokensForMemories,
         );
+        const selectionLatencyMs = Date.now() - selectionStart;
+
+        const injectionTelemetry = buildInjectionTelemetry({
+          memories: allMemories,
+          worktree: state.worktree,
+          sessionId,
+          injectionMode,
+          embeddingsEnabled,
+          maxMemories: state.config.maxMemories,
+          maxTokens: state.config.maxTokensForMemories,
+          selectionLatencyMs,
+        });
+        log(`Injection telemetry: ${JSON.stringify(injectionTelemetry)}`);
 
         // Save to global state for "list memories" feature
         setLastInjectedMemories(allMemories);

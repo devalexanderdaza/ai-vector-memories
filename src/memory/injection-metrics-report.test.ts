@@ -12,6 +12,8 @@ function buildSummary(overrides?: Partial<SummaryPayload>): SummaryPayload {
       samples: 50,
       avgSelectionLatencyMs: 80,
       p95SelectionLatencyMs: 140,
+      p95SelectionLatencyNoEmbeddingsMs: 120,
+      p95SelectionLatencyEmbeddingsMs: null,
       avgSelectedMemories: 12,
       avgTokensUsed: 1000,
       avgTokenUsagePercent: 65,
@@ -29,6 +31,8 @@ function buildSummary(overrides?: Partial<SummaryPayload>): SummaryPayload {
       samples: 120,
       avgSelectionLatencyMs: 60,
       p95SelectionLatencyMs: 110,
+      p95SelectionLatencyNoEmbeddingsMs: 105,
+      p95SelectionLatencyEmbeddingsMs: 180,
       avgSelectedMemories: 10,
       avgTokensUsed: 720,
       avgTokenUsagePercent: 54,
@@ -87,6 +91,7 @@ describe('injection metrics report payload', () => {
     expect(markdown).toContain('## Baseline vs Current');
     expect(markdown).toContain('## Proxy Metrics');
     expect(markdown).toContain('## Phase Target Evaluation');
+    expect(markdown).toContain('| Metric | Baseline | Current | Target | Status |');
     expect(markdown).toContain('| Recall Proxy |');
     expect(markdown).toContain('| Precision Top-5 Proxy |');
   });

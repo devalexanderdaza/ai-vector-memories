@@ -61,6 +61,8 @@ interface MetricsSnapshot {
   samples: number;
   avgSelectionLatencyMs: number;
   p95SelectionLatencyMs: number;
+  p95SelectionLatencyNoEmbeddingsMs: number | null;
+  p95SelectionLatencyEmbeddingsMs: number | null;
   avgSelectedMemories: number;
   avgTokensUsed: number;
   avgTokenUsagePercent: number;
@@ -126,7 +128,8 @@ interface MetricComparison {
 
 interface ProxyMetricReport {
   name: string;
-  value: number;
+  baseline: number | null;
+  current: number;
   target: number;
   status: PhaseStatus;
 }
@@ -174,6 +177,13 @@ function percentile(values: number[], percentileRank: number): number {
   return sorted[safeIndex] ?? 0;
 }
 
+function percentileOrNull(values: number[], percentileRank: number): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+  return toFixed(percentile(values, percentileRank));
+}
+
 function toFixed(value: number, digits = 2): number {
   return Number(value.toFixed(digits));
 }
@@ -215,6 +225,12 @@ function proxyStatus(value: number, target: number): PhaseStatus {
 
 function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
   const latencies = records.map((record) => record.selectionLatencyMs);
+  const latenciesNoEmbeddings = records
+    .filter((record) => !record.embeddingsEnabled)
+    .map((record) => record.selectionLatencyMs);
+  const latenciesEmbeddings = records
+    .filter((record) => record.embeddingsEnabled)
+    .map((record) => record.selectionLatencyMs);
   const selected = records.map((record) => record.selectedMemories);
   const tokens = records.map((record) => record.tokensUsed);
   const tokenPercents = records.map((record) => record.tokenUsagePercent);
@@ -252,6 +268,8 @@ function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
     samples: records.length,
     avgSelectionLatencyMs: toFixed(average(latencies)),
     p95SelectionLatencyMs: toFixed(percentile(latencies, 95)),
+    p95SelectionLatencyNoEmbeddingsMs: percentileOrNull(latenciesNoEmbeddings, 95),
+    p95SelectionLatencyEmbeddingsMs: percentileOrNull(latenciesEmbeddings, 95),
     avgSelectedMemories: toFixed(average(selected)),
     avgTokensUsed: toFixed(average(tokens)),
     avgTokenUsagePercent: toFixed(average(tokenPercents)),
@@ -292,14 +310,19 @@ function evaluateTargets(
 
 function buildPhaseEvaluations(summary: SummaryPayload): PhaseEvaluation[] {
   const tokenReduction = summary.targets.tokenReductionVsBaselinePercent;
-  const currentP95 = summary.current.p95SelectionLatencyMs;
+  const currentP95NoEmbeddings = summary.current.p95SelectionLatencyNoEmbeddingsMs;
+  const currentP95Embeddings = summary.current.p95SelectionLatencyEmbeddingsMs;
   const recallProxy = summary.current.avgRecallProxy;
 
   const mvpChecks: PhaseCheck[] = [
     {
       label: 'p95 < 120ms (no embeddings)',
-      status: checkThreshold(currentP95, PHASE_TARGETS.mvp.p95NoEmbeddingsMs, 'lte'),
-      value: currentP95,
+      status: checkThreshold(
+        currentP95NoEmbeddings,
+        PHASE_TARGETS.mvp.p95NoEmbeddingsMs,
+        'lte',
+      ),
+      value: currentP95NoEmbeddings,
       target: PHASE_TARGETS.mvp.p95NoEmbeddingsMs,
     },
     {
@@ -313,8 +336,12 @@ function buildPhaseEvaluations(summary: SummaryPayload): PhaseEvaluation[] {
   const betaChecks: PhaseCheck[] = [
     {
       label: 'p95 < 250ms (with embeddings)',
-      status: checkThreshold(currentP95, PHASE_TARGETS.beta.p95WithEmbeddingsMs, 'lte'),
-      value: currentP95,
+      status: checkThreshold(
+        currentP95Embeddings,
+        PHASE_TARGETS.beta.p95WithEmbeddingsMs,
+        'lte',
+      ),
+      value: currentP95Embeddings,
       target: PHASE_TARGETS.beta.p95WithEmbeddingsMs,
     },
     {
@@ -426,13 +453,15 @@ export function buildMetricsReportPayload(
   const proxyMetrics: ProxyMetricReport[] = [
     {
       name: 'Recall Proxy',
-      value: summary.current.avgRecallProxy,
+      baseline: summary.baseline?.avgRecallProxy ?? null,
+      current: summary.current.avgRecallProxy,
       target: TARGET_RECALL_PROXY_GA,
       status: proxyStatus(summary.current.avgRecallProxy, TARGET_RECALL_PROXY_GA),
     },
     {
       name: 'Precision Top-5 Proxy',
-      value: summary.current.avgPrecisionTop5Proxy,
+      baseline: summary.baseline?.avgPrecisionTop5Proxy ?? null,
+      current: summary.current.avgPrecisionTop5Proxy,
       target: TARGET_PRECISION_TOP5_PROXY,
       status: proxyStatus(summary.current.avgPrecisionTop5Proxy, TARGET_PRECISION_TOP5_PROXY),
     },
@@ -487,11 +516,11 @@ export function renderMetricsReportMarkdown(report: MetricsReportPayload): strin
   lines.push('');
   lines.push('## Proxy Metrics');
   lines.push('');
-  lines.push('| Metric | Value | Target | Status |');
-  lines.push('|--------|-------|--------|--------|');
+  lines.push('| Metric | Baseline | Current | Target | Status |');
+  lines.push('|--------|----------|---------|--------|--------|');
   for (const metric of report.proxyMetrics) {
     lines.push(
-      `| ${metric.name} | ${formatNumber(metric.value, 4)} | ${formatNumber(metric.target, 2)} | ${metric.status} |`,
+      `| ${metric.name} | ${formatNumber(metric.baseline, 4)} | ${formatNumber(metric.current, 4)} | ${formatNumber(metric.target, 2)} | ${metric.status} |`,
     );
   }
 

@@ -222,6 +222,26 @@ To delete a specific memory from AI Vector Memories, ask your AI assistant menti
 
 The AI assistant can directly query and update the SQLite database at `~/.ai-vector-memories/memory.db`.
 
+### Generate Metrics Report
+
+You can regenerate a baseline-vs-current metrics report anytime:
+
+```bash
+# markdown to stdout (default)
+bun run metrics:report
+
+# json to stdout
+bun run metrics:report --format json
+
+# write markdown report to file
+bun run metrics:report --output ./metrics-report.md
+```
+
+Supported flags:
+
+- `--format json|markdown` (default: `markdown`)
+- `--output <file>` (default: stdout)
+
 ### Explicit Memory Storage
 
 Use phrases like "Remember this:" or "Remember that ..." to force storage:

@@ -686,8 +686,24 @@ export async function createTrueMemoryPlugin(
         log(`Injection telemetry: ${JSON.stringify(injectionTelemetry)}`);
 
         try {
+          const availablePool = state.db
+            .getMemoriesByScope(state.worktree, 100)
+            .filter(
+              (memory) =>
+                memory.projectScope == null ||
+                memory.projectScope === state.worktree,
+            ).length;
           const scopeGlobalSelected = allMemories.filter((memory) => memory.projectScope == null).length;
           const scopeProjectSelected = allMemories.filter((memory) => memory.projectScope === state.worktree).length;
+          const top5Selected = Math.min(5, allMemories.length);
+          const top5HighTierSelected = allMemories
+            .slice(0, top5Selected)
+            .filter(
+              (memory) =>
+                memory.classification === 'constraint' ||
+                memory.classification === 'preference' ||
+                memory.classification === 'decision',
+            ).length;
 
           injectionMetricsCollector.record({
             selectionLatencyMs,
@@ -699,6 +715,9 @@ export async function createTrueMemoryPlugin(
             tokensSavedByCompression: compressionTokensSaved,
             scopeGlobalSelected,
             scopeProjectSelected,
+            poolAvailable: availablePool,
+            top5Selected,
+            top5HighTierSelected,
           });
         } catch (metricsError) {
           log(

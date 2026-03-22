@@ -9,8 +9,9 @@ import { jaccardSimilarity } from "../../memory/embeddings.js";
 import { USER_LEVEL_CLASSIFICATIONS } from "../../types.js";
 import { log } from "../../logger.js";
 import { applyCompression } from "../../memory/compression.js";
-import { getCompressionConfig } from "../../config/config.js";
+import { getCompressionConfig, getAdaptiveQuotaConfig } from "../../config/config.js";
 import { InjectionMetricsCollector } from "../../memory/injection-metrics.js";
+import type { AdaptiveQuotaConfig } from "../../types/config.js";
 
 /**
  * Adapter state interface for injection operations
@@ -119,6 +120,108 @@ interface SelectionTelemetry {
   latencyMs: number;
 }
 
+interface QuotaAllocation {
+  minGlobal: number;
+  minProject: number;
+  maxFlexible: number;
+}
+
+function normalizeQuotaRatios(config: AdaptiveQuotaConfig): {
+  globalMinRatio: number;
+  projectMinRatio: number;
+  flexibleRatio: number;
+} {
+  const globalMinRatio = Math.max(0, Math.min(1, config.globalMinRatio));
+  const projectMinRatio = Math.max(0, Math.min(1, config.projectMinRatio));
+  const flexibleRatio = Math.max(0, Math.min(1, config.flexibleRatio));
+  const sum = globalMinRatio + projectMinRatio + flexibleRatio;
+
+  if (sum <= 0) {
+    return {
+      globalMinRatio: 0.3,
+      projectMinRatio: 0.3,
+      flexibleRatio: 0.4,
+    };
+  }
+
+  return {
+    globalMinRatio: globalMinRatio / sum,
+    projectMinRatio: projectMinRatio / sum,
+    flexibleRatio: flexibleRatio / sum,
+  };
+}
+
+export function computeQuotaSlots(maxMemories: number, adaptiveQuotaConfig: AdaptiveQuotaConfig): QuotaAllocation {
+  const normalized = normalizeQuotaRatios(adaptiveQuotaConfig);
+  const minGlobal = Math.floor(maxMemories * normalized.globalMinRatio);
+  const minProject = Math.floor(maxMemories * normalized.projectMinRatio);
+  const maxFlexible = Math.max(0, maxMemories - minGlobal - minProject);
+
+  return {
+    minGlobal,
+    minProject,
+    maxFlexible,
+  };
+}
+
+function adjustQuotaSlotsWithMetrics(
+  base: QuotaAllocation,
+  adaptiveQuotaConfig: AdaptiveQuotaConfig,
+): QuotaAllocation {
+  try {
+    const collector = InjectionMetricsCollector.getInstance();
+    const summary = collector.getSummary();
+    const samples = summary.current.samples;
+
+    if (samples < adaptiveQuotaConfig.minSamplesForAdjustment) {
+      return base;
+    }
+
+    const adjustmentStep = Math.max(0, Math.min(0.2, adaptiveQuotaConfig.adjustmentStep));
+    if (adjustmentStep === 0) {
+      return base;
+    }
+
+    const projectRatioObserved = summary.current.avgProjectSelectionRatio;
+    const tokenPressureHigh = summary.current.avgTokenUsagePercent >= adaptiveQuotaConfig.highTokenUsageThreshold;
+    const slotsTotal = base.minGlobal + base.minProject + base.maxFlexible;
+
+    if (slotsTotal <= 0) {
+      return base;
+    }
+
+    let ratioDelta = 0;
+    if (projectRatioObserved < adaptiveQuotaConfig.targetProjectRatio) {
+      ratioDelta = adjustmentStep;
+    } else if (projectRatioObserved > adaptiveQuotaConfig.targetProjectRatio) {
+      ratioDelta = -adjustmentStep;
+    }
+
+    const tokenPenalty = tokenPressureHigh ? Math.min(adjustmentStep / 2, 0.05) : 0;
+
+    const adjustedGlobalRatio = Math.max(0, (base.minGlobal / slotsTotal) - ratioDelta / 2 + tokenPenalty / 2);
+    const adjustedProjectRatio = Math.max(0, (base.minProject / slotsTotal) + ratioDelta - tokenPenalty);
+    const adjustedFlexibleRatio = Math.max(0, (base.maxFlexible / slotsTotal) - ratioDelta / 2 + tokenPenalty / 2);
+
+    const normalized = normalizeQuotaRatios({
+      ...adaptiveQuotaConfig,
+      globalMinRatio: adjustedGlobalRatio,
+      projectMinRatio: adjustedProjectRatio,
+      flexibleRatio: adjustedFlexibleRatio,
+    });
+
+    return computeQuotaSlots(slotsTotal, {
+      ...adaptiveQuotaConfig,
+      globalMinRatio: normalized.globalMinRatio,
+      projectMinRatio: normalized.projectMinRatio,
+      flexibleRatio: normalized.flexibleRatio,
+    });
+  } catch (error) {
+    log(`Adaptive quota metrics adjustment failed, using base quotas: ${error instanceof Error ? error.message : String(error)}`);
+    return base;
+  }
+}
+
 function buildSelectionTelemetry(params: {
     worktree: string;
     selectedMemories: MemoryUnit[];
@@ -139,7 +242,7 @@ function buildSelectionTelemetry(params: {
       classificationCounts[memory.classification] =
         (classificationCounts[memory.classification] ?? 0) + 1;
 
-      if (memory.projectScope === null) {
+      if (memory.projectScope == null) {
         globalCount++;
       } else {
         projectCount++;
@@ -328,11 +431,22 @@ export async function selectMemoriesForInjection(
    let totalTokens = 0;
    let selectionMode: SelectionMode = "none";
 
-  // Scale quotas proportionally
-  const MIN_GLOBAL = Math.floor(maxMemories * 0.3);
-  const MIN_PROJECT = Math.floor(maxMemories * 0.3);
-  const MAX_FLEXIBLE = maxMemories - MIN_GLOBAL - MIN_PROJECT;
-  const MAX_CONSTRAINTS = 10;
+   const adaptiveQuotaConfig = getAdaptiveQuotaConfig();
+   const staticQuota = computeQuotaSlots(maxMemories, {
+     ...adaptiveQuotaConfig,
+     globalMinRatio: 0.3,
+     projectMinRatio: 0.3,
+     flexibleRatio: 0.4,
+   });
+   const baseQuota = computeQuotaSlots(maxMemories, adaptiveQuotaConfig);
+   const effectiveQuota = adaptiveQuotaConfig.enabled
+     ? adjustQuotaSlotsWithMetrics(baseQuota, adaptiveQuotaConfig)
+     : staticQuota;
+
+   const MIN_GLOBAL = effectiveQuota.minGlobal;
+   const MIN_PROJECT = effectiveQuota.minProject;
+   const MAX_FLEXIBLE = effectiveQuota.maxFlexible;
+   const MAX_CONSTRAINTS = 10;
 
   // Validate worktree parameter
   if (!worktree || worktree.trim() === '') {
@@ -341,9 +455,12 @@ export async function selectMemoriesForInjection(
 
   // Step 1: Get all memories
   const allMemories = db.getMemoriesByScope(worktree, 100);
+  const scopedMemories = allMemories.filter(
+    (memory) => memory.projectScope == null || memory.projectScope === worktree,
+  );
 
-  const globalMemories = allMemories.filter((m) => m.projectScope === null);
-  const projectMemories = allMemories.filter((m) => m.projectScope !== null);
+  const globalMemories = scopedMemories.filter((m) => m.projectScope == null);
+  const projectMemories = scopedMemories.filter((m) => m.projectScope === worktree);
 
   // Helper: Add memory if within slots and token budget
   const addMemory = (memory: MemoryUnit): boolean => {
@@ -367,8 +484,11 @@ export async function selectMemoriesForInjection(
     return true;
   };
 
+  const baselineScopeGlobal = Math.min(globalMemories.length, staticQuota.minGlobal);
+  const baselineScopeProject = Math.min(projectMemories.length, staticQuota.minProject);
+
   // Step 2: Tier 0 - Constraints (capped)
-  const constraints = allMemories
+  const constraints = scopedMemories
     .filter((m) => m.classification === "constraint")
     .sort((a, b) => b.strength - a.strength)
     .slice(0, MAX_CONSTRAINTS);
@@ -424,13 +544,9 @@ export async function selectMemoriesForInjection(
     queryContext.trim().length > 0
   ) {
     selectionMode = "dynamic";
-    const relevant = await db.vectorSearch(
-      queryContext,
-      worktree,
-      MAX_FLEXIBLE,
-    );
+    const relevant = await db.vectorSearch(queryContext, worktree, Math.max(MAX_FLEXIBLE, remainingSlots));
     const newMemories = prioritizeByTier(
-      relevant.filter((m) => !selectedIds.has(m.id)),
+      relevant.filter((m) => !selectedIds.has(m.id) && (m.projectScope === null || m.projectScope === worktree)),
     );
 
     for (const memory of newMemories.slice(0, remainingSlots)) {
@@ -445,7 +561,7 @@ export async function selectMemoriesForInjection(
     );
   } else if (remainingSlots > 0) {
     selectionMode = "fallback";
-    const remaining = allMemories
+    const remaining = scopedMemories
       .filter((m) => !selectedIds.has(m.id))
       .sort((a, b) => {
         const tierDiff =
@@ -495,6 +611,31 @@ export async function selectMemoriesForInjection(
     }
   }
 
+  const selectedScopeGlobal = memories.filter((memory) => memory.projectScope == null).length;
+  const selectedScopeProject = memories.filter((memory) => memory.projectScope === worktree).length;
+  const estimatedAvgTokensPerMemory = memories.length > 0 ? Math.round(totalTokens / memories.length) : 0;
+  const baselineSelectedCount = Math.min(maxMemories, baselineScopeGlobal + baselineScopeProject + staticQuota.maxFlexible);
+  const estimatedBaselineTokens = baselineSelectedCount * estimatedAvgTokensPerMemory;
+
+  try {
+    InjectionMetricsCollector.getInstance().recordQuotaImpact({
+      baseline: {
+        selectedCount: baselineSelectedCount,
+        tokensUsed: estimatedBaselineTokens,
+        scopeGlobalSelected: baselineScopeGlobal,
+        scopeProjectSelected: baselineScopeProject,
+      },
+      adjusted: {
+        selectedCount: memories.length,
+        tokensUsed: totalTokens,
+        scopeGlobalSelected: selectedScopeGlobal,
+        scopeProjectSelected: selectedScopeProject,
+      },
+    });
+  } catch (error) {
+    log(`Adaptive quota impact metrics failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
 let telemetry;
       const latencyMs = Date.now() - startTime;
       try {
@@ -537,6 +678,32 @@ let telemetry;
       } catch (loggingError) {
         // If logging fails, we ignore it to maintain fail-open
       }
+
+  if (adaptiveQuotaConfig.enabled) {
+    try {
+      const adaptiveSummary = {
+        enabled: adaptiveQuotaConfig.enabled,
+        base: {
+          minGlobal: baseQuota.minGlobal,
+          minProject: baseQuota.minProject,
+          maxFlexible: baseQuota.maxFlexible,
+        },
+        effective: {
+          minGlobal: MIN_GLOBAL,
+          minProject: MIN_PROJECT,
+          maxFlexible: MAX_FLEXIBLE,
+        },
+        selected: {
+          global: selectedScopeGlobal,
+          project: selectedScopeProject,
+          total: memories.length,
+        },
+      };
+      log(`Adaptive quota report: ${JSON.stringify(adaptiveSummary)}`);
+    } catch (error) {
+      log(`Adaptive quota report logging failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   return memories;
 }

@@ -15,6 +15,8 @@ export interface InjectionMetricsRecord {
   embeddingsEnabled: boolean;
   compressionEvents: number;
   tokensSavedByCompression: number;
+  scopeGlobalSelected: number;
+  scopeProjectSelected: number;
 }
 
 interface MetricsSnapshot {
@@ -27,6 +29,9 @@ interface MetricsSnapshot {
   totalCompressionEvents: number;
   totalTokensSavedByCompression: number;
   avgTokensSavedByCompression: number;
+  avgScopeGlobalSelected: number;
+  avgScopeProjectSelected: number;
+  avgProjectSelectionRatio: number;
 }
 
 interface TargetEvaluation {
@@ -40,6 +45,35 @@ interface SummaryPayload {
   baseline: MetricsSnapshot | null;
   current: MetricsSnapshot;
   targets: TargetEvaluation;
+  quotaImpact: QuotaImpactSummary | null;
+}
+
+export interface QuotaImpactRecord {
+  baseline: {
+    selectedCount: number;
+    tokensUsed: number;
+    scopeGlobalSelected: number;
+    scopeProjectSelected: number;
+  };
+  adjusted: {
+    selectedCount: number;
+    tokensUsed: number;
+    scopeGlobalSelected: number;
+    scopeProjectSelected: number;
+  };
+}
+
+interface QuotaImpactSummary {
+  samples: number;
+  avgSelectedBefore: number;
+  avgSelectedAfter: number;
+  avgTokensBefore: number;
+  avgTokensAfter: number;
+  avgTokenDelta: number;
+  avgGlobalBefore: number;
+  avgGlobalAfter: number;
+  avgProjectBefore: number;
+  avgProjectAfter: number;
 }
 
 const MAX_WINDOW_SIZE = 300;
@@ -70,6 +104,13 @@ function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
   const tokenPercents = records.map((record) => record.tokenUsagePercent);
   const compressionEvents = records.map((record) => record.compressionEvents);
   const tokensSaved = records.map((record) => record.tokensSavedByCompression);
+  const scopeGlobalSelected = records.map((record) => record.scopeGlobalSelected);
+  const scopeProjectSelected = records.map((record) => record.scopeProjectSelected);
+  const projectRatios = records.map((record) => {
+    const total = record.scopeGlobalSelected + record.scopeProjectSelected;
+    if (total <= 0) return 0;
+    return record.scopeProjectSelected / total;
+  });
 
   return {
     samples: records.length,
@@ -81,6 +122,9 @@ function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
     totalCompressionEvents: compressionEvents.reduce((sum, v) => sum + v, 0),
     totalTokensSavedByCompression: tokensSaved.reduce((sum, v) => sum + v, 0),
     avgTokensSavedByCompression: Number(average(tokensSaved).toFixed(2)),
+    avgScopeGlobalSelected: Number(average(scopeGlobalSelected).toFixed(2)),
+    avgScopeProjectSelected: Number(average(scopeProjectSelected).toFixed(2)),
+    avgProjectSelectionRatio: Number(average(projectRatios).toFixed(4)),
   };
 }
 
@@ -117,6 +161,7 @@ export class InjectionMetricsCollector {
   private static instance: InjectionMetricsCollector;
 
   private records: InjectionMetricsRecord[] = [];
+  private quotaImpactRecords: QuotaImpactRecord[] = [];
   private baseline: MetricsSnapshot | null = null;
   private totalInjections = 0;
 
@@ -130,8 +175,24 @@ export class InjectionMetricsCollector {
   }
 
   record(record: InjectionMetricsRecord): void {
+    const safeRecord: InjectionMetricsRecord = {
+      ...record,
+      compressionEvents: Number.isFinite(record.compressionEvents)
+        ? record.compressionEvents
+        : 0,
+      tokensSavedByCompression: Number.isFinite(record.tokensSavedByCompression)
+        ? record.tokensSavedByCompression
+        : 0,
+      scopeGlobalSelected: Number.isFinite(record.scopeGlobalSelected)
+        ? record.scopeGlobalSelected
+        : 0,
+      scopeProjectSelected: Number.isFinite(record.scopeProjectSelected)
+        ? record.scopeProjectSelected
+        : 0,
+    };
+
     this.totalInjections++;
-    this.records.push(record);
+    this.records.push(safeRecord);
 
     if (this.records.length > MAX_WINDOW_SIZE) {
       this.records.shift();
@@ -148,6 +209,42 @@ export class InjectionMetricsCollector {
     }
   }
 
+  recordQuotaImpact(record: QuotaImpactRecord): void {
+    this.quotaImpactRecords.push(record);
+    if (this.quotaImpactRecords.length > MAX_WINDOW_SIZE) {
+      this.quotaImpactRecords.shift();
+    }
+  }
+
+  private buildQuotaImpactSummary(): QuotaImpactSummary | null {
+    if (this.quotaImpactRecords.length === 0) {
+      return null;
+    }
+
+    const selectedBefore = this.quotaImpactRecords.map((r) => r.baseline.selectedCount);
+    const selectedAfter = this.quotaImpactRecords.map((r) => r.adjusted.selectedCount);
+    const tokensBefore = this.quotaImpactRecords.map((r) => r.baseline.tokensUsed);
+    const tokensAfter = this.quotaImpactRecords.map((r) => r.adjusted.tokensUsed);
+    const globalBefore = this.quotaImpactRecords.map((r) => r.baseline.scopeGlobalSelected);
+    const globalAfter = this.quotaImpactRecords.map((r) => r.adjusted.scopeGlobalSelected);
+    const projectBefore = this.quotaImpactRecords.map((r) => r.baseline.scopeProjectSelected);
+    const projectAfter = this.quotaImpactRecords.map((r) => r.adjusted.scopeProjectSelected);
+    const tokenDelta = this.quotaImpactRecords.map((r) => r.adjusted.tokensUsed - r.baseline.tokensUsed);
+
+    return {
+      samples: this.quotaImpactRecords.length,
+      avgSelectedBefore: Number(average(selectedBefore).toFixed(2)),
+      avgSelectedAfter: Number(average(selectedAfter).toFixed(2)),
+      avgTokensBefore: Number(average(tokensBefore).toFixed(2)),
+      avgTokensAfter: Number(average(tokensAfter).toFixed(2)),
+      avgTokenDelta: Number(average(tokenDelta).toFixed(2)),
+      avgGlobalBefore: Number(average(globalBefore).toFixed(2)),
+      avgGlobalAfter: Number(average(globalAfter).toFixed(2)),
+      avgProjectBefore: Number(average(projectBefore).toFixed(2)),
+      avgProjectAfter: Number(average(projectAfter).toFixed(2)),
+    };
+  }
+
   recordCompression(tokensSaved: number): void {
     const latest = this.records[this.records.length - 1];
     if (latest) {
@@ -159,11 +256,13 @@ export class InjectionMetricsCollector {
   getSummary(): SummaryPayload {
     const current = snapshotFrom(this.records);
     const targets = evaluateTargets(current, this.baseline);
+    const quotaImpact = this.buildQuotaImpactSummary();
 
     return {
       baseline: this.baseline,
       current,
       targets,
+      quotaImpact,
     };
   }
 }

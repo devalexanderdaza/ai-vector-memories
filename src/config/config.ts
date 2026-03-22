@@ -15,8 +15,18 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { log } from '../logger.js';
-import type { TrueMemUserConfig, InjectionMode, SubAgentMode, CompressionConfig } from '../types/config.js';
-import { DEFAULT_USER_CONFIG, DEFAULT_COMPRESSION_CONFIG } from '../types/config.js';
+import type {
+  TrueMemUserConfig,
+  InjectionMode,
+  SubAgentMode,
+  CompressionConfig,
+  AdaptiveQuotaConfig,
+} from '../types/config.js';
+import {
+  DEFAULT_USER_CONFIG,
+  DEFAULT_COMPRESSION_CONFIG,
+  DEFAULT_ADAPTIVE_QUOTA_CONFIG,
+} from '../types/config.js';
 import { parseJsonc } from '../utils/jsonc.js';
 
 const CONFIG_DIR = join(homedir(), '.ai-vector-memories');
@@ -121,6 +131,153 @@ function validateCompressionConfig(value: unknown): CompressionConfig {
   return { enabled, maxCompressionRatio: maxRatio, minSummaryLength: minLen, excludedTiers };
 }
 
+function clampRatio(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeRatios(globalMinRatio: number, projectMinRatio: number, flexibleRatio: number): {
+  globalMinRatio: number;
+  projectMinRatio: number;
+  flexibleRatio: number;
+} {
+  const sum = globalMinRatio + projectMinRatio + flexibleRatio;
+  if (sum <= 0) {
+    return {
+      globalMinRatio: DEFAULT_ADAPTIVE_QUOTA_CONFIG.globalMinRatio,
+      projectMinRatio: DEFAULT_ADAPTIVE_QUOTA_CONFIG.projectMinRatio,
+      flexibleRatio: DEFAULT_ADAPTIVE_QUOTA_CONFIG.flexibleRatio,
+    };
+  }
+  return {
+    globalMinRatio: globalMinRatio / sum,
+    projectMinRatio: projectMinRatio / sum,
+    flexibleRatio: flexibleRatio / sum,
+  };
+}
+
+function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean {
+  if (!value) return fallback;
+  const parsed = value.trim().toLowerCase();
+  if (parsed === '1' || parsed === 'true') return true;
+  if (parsed === '0' || parsed === 'false') return false;
+  return fallback;
+}
+
+function parseNumberEnv(value: string | undefined, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function validateAdaptiveQuotaConfig(value: unknown): AdaptiveQuotaConfig {
+  if (typeof value !== 'object' || value === null) {
+    return DEFAULT_ADAPTIVE_QUOTA_CONFIG;
+  }
+
+  const cfg = value as Record<string, unknown>;
+  const enabled = typeof cfg.enabled === 'boolean'
+    ? cfg.enabled
+    : DEFAULT_ADAPTIVE_QUOTA_CONFIG.enabled;
+
+  const globalMinRatio = clampRatio(
+    typeof cfg.globalMinRatio === 'number'
+      ? cfg.globalMinRatio
+      : DEFAULT_ADAPTIVE_QUOTA_CONFIG.globalMinRatio,
+  );
+  const projectMinRatio = clampRatio(
+    typeof cfg.projectMinRatio === 'number'
+      ? cfg.projectMinRatio
+      : DEFAULT_ADAPTIVE_QUOTA_CONFIG.projectMinRatio,
+  );
+  const flexibleRatio = clampRatio(
+    typeof cfg.flexibleRatio === 'number'
+      ? cfg.flexibleRatio
+      : DEFAULT_ADAPTIVE_QUOTA_CONFIG.flexibleRatio,
+  );
+
+  const normalized = normalizeRatios(globalMinRatio, projectMinRatio, flexibleRatio);
+
+  const adjustmentStep = Math.max(
+    0,
+    Math.min(
+      0.2,
+      typeof cfg.adjustmentStep === 'number'
+        ? cfg.adjustmentStep
+        : DEFAULT_ADAPTIVE_QUOTA_CONFIG.adjustmentStep,
+    ),
+  );
+  const minSamplesForAdjustment = Math.max(
+    1,
+    Math.floor(
+      typeof cfg.minSamplesForAdjustment === 'number'
+        ? cfg.minSamplesForAdjustment
+        : DEFAULT_ADAPTIVE_QUOTA_CONFIG.minSamplesForAdjustment,
+    ),
+  );
+  const targetProjectRatio = clampRatio(
+    typeof cfg.targetProjectRatio === 'number'
+      ? cfg.targetProjectRatio
+      : DEFAULT_ADAPTIVE_QUOTA_CONFIG.targetProjectRatio,
+  );
+  const highTokenUsageThreshold = Math.max(
+    0,
+    Math.min(
+      100,
+      typeof cfg.highTokenUsageThreshold === 'number'
+        ? cfg.highTokenUsageThreshold
+        : DEFAULT_ADAPTIVE_QUOTA_CONFIG.highTokenUsageThreshold,
+    ),
+  );
+
+  return {
+    enabled,
+    globalMinRatio: normalized.globalMinRatio,
+    projectMinRatio: normalized.projectMinRatio,
+    flexibleRatio: normalized.flexibleRatio,
+    adjustmentStep,
+    minSamplesForAdjustment,
+    targetProjectRatio,
+    highTokenUsageThreshold,
+  };
+}
+
+function applyAdaptiveQuotaEnvOverrides(base: AdaptiveQuotaConfig): AdaptiveQuotaConfig {
+  const envEnabled = parseBooleanEnv(process.env.TRUE_MEM_ADAPTIVE_QUOTA_ENABLED, base.enabled);
+
+  const envGlobalMinRatio = clampRatio(
+    parseNumberEnv(process.env.TRUE_MEM_QUOTA_GLOBAL_MIN_RATIO, base.globalMinRatio),
+  );
+  const envProjectMinRatio = clampRatio(
+    parseNumberEnv(process.env.TRUE_MEM_QUOTA_PROJECT_MIN_RATIO, base.projectMinRatio),
+  );
+  const envFlexibleRatio = clampRatio(
+    parseNumberEnv(process.env.TRUE_MEM_QUOTA_FLEXIBLE_RATIO, base.flexibleRatio),
+  );
+  const normalized = normalizeRatios(envGlobalMinRatio, envProjectMinRatio, envFlexibleRatio);
+
+  return {
+    enabled: envEnabled,
+    globalMinRatio: normalized.globalMinRatio,
+    projectMinRatio: normalized.projectMinRatio,
+    flexibleRatio: normalized.flexibleRatio,
+    adjustmentStep: Math.max(
+      0,
+      Math.min(0.2, parseNumberEnv(process.env.TRUE_MEM_QUOTA_ADJUSTMENT_STEP, base.adjustmentStep)),
+    ),
+    minSamplesForAdjustment: Math.max(
+      1,
+      Math.floor(parseNumberEnv(process.env.TRUE_MEM_QUOTA_MIN_SAMPLES, base.minSamplesForAdjustment)),
+    ),
+    targetProjectRatio: clampRatio(
+      parseNumberEnv(process.env.TRUE_MEM_QUOTA_TARGET_PROJECT_RATIO, base.targetProjectRatio),
+    ),
+    highTokenUsageThreshold: Math.max(
+      0,
+      Math.min(100, parseNumberEnv(process.env.TRUE_MEM_QUOTA_HIGH_TOKEN_THRESHOLD, base.highTokenUsageThreshold)),
+    ),
+  };
+}
+
 /**
  * Parse embeddings enabled from env or return default
  * Returns 0 or 1 (number for JSONC config compatibility)
@@ -174,6 +331,10 @@ export function loadConfig(): TrueMemUserConfig {
   const compression: CompressionConfig = compressionEnabledFromEnv !== DEFAULT_COMPRESSION_CONFIG.enabled
     ? { ...fileCompression, enabled: compressionEnabledFromEnv }
     : fileCompression;
+  const fileAdaptiveQuota = fileConfig.adaptiveQuota
+    ? validateAdaptiveQuotaConfig(fileConfig.adaptiveQuota)
+    : DEFAULT_ADAPTIVE_QUOTA_CONFIG;
+  const adaptiveQuota = applyAdaptiveQuotaEnvOverrides(fileAdaptiveQuota);
 
   const config: TrueMemUserConfig = {
     injectionMode: envInjectionMode !== undefined
@@ -189,10 +350,11 @@ export function loadConfig(): TrueMemUserConfig {
       ? parseEmbeddingsEnabled(envEmbeddingsEnabled)
       : validateEmbeddingsEnabled(fileConfig.embeddingsEnabled),
     compression,
+    adaptiveQuota,
   };
   
   // Log the final config
-  log(`Config: injectionMode=${config.injectionMode}, subagentMode=${config.subagentMode}, maxMemories=${config.maxMemories}, embeddingsEnabled=${config.embeddingsEnabled}, compression.enabled=${config.compression.enabled}`);
+  log(`Config: injectionMode=${config.injectionMode}, subagentMode=${config.subagentMode}, maxMemories=${config.maxMemories}, embeddingsEnabled=${config.embeddingsEnabled}, compression.enabled=${config.compression.enabled}, adaptiveQuota.enabled=${config.adaptiveQuota.enabled}`);
   
   return config;
 }
@@ -227,6 +389,33 @@ export function generateConfigWithComments(config: TrueMemUserConfig): string {
 
     // Tiers excluded from compression (Tier 0=constraint, Tier 1=preference/decision)
     "excludedTiers": [${config.compression.excludedTiers.join(', ')}]
+  },
+
+  // Adaptive quota settings for global/project/flexible scope allocation
+  "adaptiveQuota": {
+    // Enable adaptive quotas: true = enabled, false = disabled (default)
+    "enabled": ${config.adaptiveQuota.enabled},
+
+    // Base minimum share for global scope (0.0-1.0)
+    "globalMinRatio": ${config.adaptiveQuota.globalMinRatio},
+
+    // Base minimum share for project scope (0.0-1.0)
+    "projectMinRatio": ${config.adaptiveQuota.projectMinRatio},
+
+    // Flexible share assignable to either scope (0.0-1.0)
+    "flexibleRatio": ${config.adaptiveQuota.flexibleRatio},
+
+    // Maximum ratio delta applied by adaptive adjustments per window
+    "adjustmentStep": ${config.adaptiveQuota.adjustmentStep},
+
+    // Minimum metric samples required before applying adaptive adjustments
+    "minSamplesForAdjustment": ${config.adaptiveQuota.minSamplesForAdjustment},
+
+    // Desired fraction of selected memories from project scope (0.0-1.0)
+    "targetProjectRatio": ${config.adaptiveQuota.targetProjectRatio},
+
+    // High token pressure threshold in percent (0-100)
+    "highTokenUsageThreshold": ${config.adaptiveQuota.highTokenUsageThreshold}
   }
 }`;
 }
@@ -283,4 +472,11 @@ export function getEmbeddingsEnabledFromConfig(): number {
  */
 export function getCompressionConfig(): CompressionConfig {
   return loadConfig().compression;
+}
+
+/**
+ * Get adaptive quota config (convenience function)
+ */
+export function getAdaptiveQuotaConfig(): AdaptiveQuotaConfig {
+  return loadConfig().adaptiveQuota;
 }

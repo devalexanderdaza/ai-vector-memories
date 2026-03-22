@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Import types directly from the files where they're defined
-import type { PsychMemConfig } from '../../../config.js';
-import type { MemoryDatabase } from '../../../storage/database.js';
-import { createMemoryDatabase } from '../../../storage/database.js';
-import { getAtomicMemories, InjectionState, selectMemoriesForInjection, wrapMemories, InjectionType } from '../../adapters/opencode/injection.js';
-import { DEFAULT_CONFIG } from '../../../config.js';
+import type { PsychMemConfig } from '../types.js';
+import type { MemoryDatabase } from '../storage/database.js';
+import { createMemoryDatabase } from '../storage/database.js';
+import { getAtomicMemories, type InjectionState, selectMemoriesForInjection } from '../adapters/opencode/injection.js';
+import { DEFAULT_CONFIG } from '../config.js';
 
 // Mock the logger to avoid output during tests
 vi.mock('../../../logger.js', () => ({
@@ -221,7 +221,7 @@ describe('Integration Tests: Retrieval and Injection Flow', () => {
       
       const projectAAIds = projectAMemories.map((m: any) => m.projectScope);
       expect(projectAAIds).toContain(projectA); // Has project A memories
-      expect(projectAAIds).toContain(null);     // Has global memories
+      expect(projectAAIds).toContain(undefined); // Has global memories
       expect(projectAAIds).not.toContain(projectB); // Should NOT have project B memories
 
       // Test retrieval for project B - should get project B memories + global
@@ -234,7 +234,7 @@ describe('Integration Tests: Retrieval and Injection Flow', () => {
       
       const projectBIds = projectBMemories.map((m: any) => m.projectScope);
       expect(projectBIds).toContain(projectB); // Has project B memories
-      expect(projectBIds).toContain(null);     // Has global memories
+      expect(projectBIds).toContain(undefined); // Has global memories
       expect(projectBIds).not.toContain(projectA); // Should NOT have project A memories
     });
 
@@ -262,7 +262,7 @@ describe('Integration Tests: Retrieval and Injection Flow', () => {
       );
       
       // Should only return global memories
-      expect(memories.every((m: any) => m.projectScope === null)).toBe(true);
+      expect(memories.every((m: any) => m.projectScope === undefined)).toBe(true);
       expect(memories.length).toBeGreaterThan(0);
     });
   });
@@ -316,7 +316,9 @@ describe('Integration Tests: Retrieval and Injection Flow', () => {
       // Should return memories sorted by strength (descending)
       expect(memories.length).toBeGreaterThan(0);
       if (memories.length >= 2) {
-        expect(memories[0]?.strength).toBeGreaterThanOrEqual(memories[1]?.strength);
+        const firstStrength = memories[0]?.strength ?? 0;
+        const secondStrength = memories[1]?.strength ?? 0;
+        expect(firstStrength).toBeGreaterThanOrEqual(secondStrength);
       }
       
       // Stronger memory should come first

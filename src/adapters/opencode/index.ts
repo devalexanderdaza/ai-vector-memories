@@ -679,6 +679,9 @@ export async function createTrueMemoryPlugin(
         log(`Injection telemetry: ${JSON.stringify(injectionTelemetry)}`);
 
         try {
+          const scopeGlobalSelected = allMemories.filter((memory) => memory.projectScope == null).length;
+          const scopeProjectSelected = allMemories.filter((memory) => memory.projectScope === state.worktree).length;
+
           injectionMetricsCollector.record({
             selectionLatencyMs,
             selectedMemories: allMemories.length,
@@ -687,6 +690,8 @@ export async function createTrueMemoryPlugin(
             embeddingsEnabled,
             compressionEvents: 0,
             tokensSavedByCompression: 0,
+            scopeGlobalSelected,
+            scopeProjectSelected,
           });
         } catch (metricsError) {
           log(

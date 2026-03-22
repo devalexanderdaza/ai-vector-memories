@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, it } from 'vitest';
 import { compressMemorySummary, applyCompression, getCompressibleTiers } from './compression.js';
 import type { MemoryUnit, MemoryClassification, MemoryStore, MemoryStatus } from '../types.js';
 import type { CompressionConfig } from '../types/config.js';
@@ -49,13 +49,13 @@ function makeConfig(overrides: Partial<CompressionConfig> = {}): CompressionConf
 }
 
 describe('compressMemorySummary', () => {
-  test('returns unchanged memory when summary is shorter than maxChars', () => {
+  it('returns unchanged memory when summary is shorter than maxChars', () => {
     const mem = makeMemory('1', 'semantic', 'short text');
     const result = compressMemorySummary(mem, 100, 10);
     expect(result.summary).toBe('short text');
   });
 
-  test('truncates at word boundary with ellipsis', () => {
+  it('truncates at word boundary with ellipsis', () => {
     const longText = 'this is a very long summary that should be truncated at word boundary properly';
     const mem = makeMemory('1', 'semantic', longText);
     const result = compressMemorySummary(mem, 30, 10);
@@ -63,13 +63,13 @@ describe('compressMemorySummary', () => {
     expect(result.summary.endsWith('…')).toBe(true);
   });
 
-  test('preserves minLength even if last space is before it', () => {
+  it('preserves minLength even if last space is before it', () => {
     const mem = makeMemory('1', 'semantic', 'ab cd ef gh ij kl mn op');
     const result = compressMemorySummary(mem, 5, 5);
     expect(result.summary.length).toBeGreaterThanOrEqual(5);
   });
 
-  test('does not add ellipsis if no truncation needed', () => {
+  it('does not add ellipsis if no truncation needed', () => {
     const mem = makeMemory('1', 'semantic', 'tiny');
     const result = compressMemorySummary(mem, 10, 5);
     expect(result.summary).toBe('tiny');
@@ -78,24 +78,24 @@ describe('compressMemorySummary', () => {
 });
 
 describe('getCompressibleTiers', () => {
-  test('returns [2, 3] by default', () => {
+  it('returns [2, 3] by default', () => {
     const config = makeConfig();
     expect(getCompressibleTiers(config)).toEqual([2, 3]);
   });
 
-  test('excludes configured tiers', () => {
+  it('excludes configured tiers', () => {
     const config = makeConfig({ excludedTiers: [3] });
     expect(getCompressibleTiers(config)).toEqual([2]);
   });
 
-  test('returns empty array if all tiers excluded', () => {
+  it('returns empty array if all tiers excluded', () => {
     const config = makeConfig({ excludedTiers: [0, 1, 2, 3] });
     expect(getCompressibleTiers(config)).toEqual([]);
   });
 });
 
 describe('applyCompression', () => {
-  test('returns original when disabled', () => {
+  it('returns original when disabled', () => {
     const mem = makeMemory('1', 'semantic', 'a'.repeat(200));
     const mems = [mem];
     const config = makeConfig({ enabled: false });
@@ -105,7 +105,7 @@ describe('applyCompression', () => {
     expect(result.tokensSaved).toBe(0);
   });
 
-  test('returns original when under budget', () => {
+  it('returns original when under budget', () => {
     const mem = makeMemory('1', 'semantic', 'short');
     const mems = [mem];
     const config = makeConfig({ enabled: true });
@@ -114,7 +114,7 @@ describe('applyCompression', () => {
     expect(result.memories.some((m) => m.summary === mem.summary)).toBe(true);
   });
 
-  test('never compresses Tier 0 (constraint)', () => {
+  it('never compresses Tier 0 (constraint)', () => {
     const mems = [
       makeMemory('1', 'constraint', 'a'.repeat(200)),
       makeMemory('2', 'semantic', 'b'.repeat(200)),
@@ -125,7 +125,7 @@ describe('applyCompression', () => {
     expect(constraint?.summary ?? '').toBe('a'.repeat(200));
   });
 
-  test('never compresses Tier 1 (preference, decision)', () => {
+  it('never compresses Tier 1 (preference, decision)', () => {
     const mems = [
       makeMemory('1', 'preference', 'a'.repeat(200)),
       makeMemory('2', 'decision', 'b'.repeat(200)),
@@ -141,7 +141,7 @@ describe('applyCompression', () => {
     expect(semantic?.summary.length ?? 0).toBeLessThan(200);
   });
 
-  test('compresses Tier 2 (learning, procedural)', () => {
+  it('compresses Tier 2 (learning, procedural)', () => {
     const mems = [
       makeMemory('1', 'semantic', 'a'.repeat(200)),
       makeMemory('2', 'learning', 'b'.repeat(200)),
@@ -156,7 +156,7 @@ describe('applyCompression', () => {
     expect(result.tokensSaved).toBeGreaterThan(0);
   });
 
-  test('saves tokens when compression applied', () => {
+  it('saves tokens when compression applied', () => {
     const mems = [
       makeMemory('1', 'semantic', 'a'.repeat(500)),
       makeMemory('2', 'semantic', 'b'.repeat(500)),
@@ -169,7 +169,7 @@ describe('applyCompression', () => {
     }
   });
 
-  test('returns unchanged when maxTokens equals currentTokens', () => {
+  it('returns unchanged when maxTokens equals currentTokens', () => {
     const mem = makeMemory('1', 'semantic', 'a'.repeat(500));
     const mems = [mem];
     const config = makeConfig({ enabled: true });
@@ -178,14 +178,14 @@ describe('applyCompression', () => {
     expect(result.tokensSaved).toBe(0);
   });
 
-  test('handles empty memories array', () => {
+  it('handles empty memories array', () => {
     const config = makeConfig();
     const result = applyCompression([], 1000, 100, config);
     expect(result.memories.length).toBe(0);
     expect(result.tokensSaved).toBe(0);
   });
 
-  test('maxCompressionRatio = 0 produces minLength summaries', () => {
+  it('maxCompressionRatio = 0 produces minLength summaries', () => {
     const mems = [makeMemory('1', 'semantic', 'a'.repeat(500))];
     const config = makeConfig({ maxCompressionRatio: 0, minSummaryLength: 20 });
     const result = applyCompression(mems, 1000, 100, config);
@@ -194,7 +194,7 @@ describe('applyCompression', () => {
     expect(result.tokensSaved).toBeGreaterThan(0);
   });
 
-  test('single-word string truncated at maxChars boundary', () => {
+  it('single-word string truncated at maxChars boundary', () => {
     const mem = makeMemory('1', 'semantic', 'aaaaaaaaaa');
     const result = compressMemorySummary(mem, 5, 3);
     expect(result.summary.length).toBeLessThan(10);

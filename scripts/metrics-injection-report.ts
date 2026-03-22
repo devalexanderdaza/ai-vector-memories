@@ -9,6 +9,9 @@ interface MetricsSnapshot {
   avgSelectedMemories: number;
   avgTokensUsed: number;
   avgTokenUsagePercent: number;
+  avgScopeGlobalSelected?: number;
+  avgScopeProjectSelected?: number;
+  avgProjectSelectionRatio?: number;
 }
 
 interface TargetEvaluation {
@@ -22,6 +25,18 @@ interface SummaryPayload {
   baseline: MetricsSnapshot | null;
   current: MetricsSnapshot;
   targets: TargetEvaluation;
+  quotaImpact?: {
+    samples: number;
+    avgSelectedBefore: number;
+    avgSelectedAfter: number;
+    avgTokensBefore: number;
+    avgTokensAfter: number;
+    avgTokenDelta: number;
+    avgGlobalBefore: number;
+    avgGlobalAfter: number;
+    avgProjectBefore: number;
+    avgProjectAfter: number;
+  } | null;
 }
 
 const LOG_FILE = join(homedir(), ".ai-vector-memories", "plugin-debug.log");
@@ -76,6 +91,15 @@ function printSnapshot(title: string, snapshot: MetricsSnapshot | null): void {
   console.log(`  avgSelectedMemories: ${snapshot.avgSelectedMemories}`);
   console.log(`  avgTokensUsed: ${snapshot.avgTokensUsed}`);
   console.log(`  avgTokenUsagePercent: ${snapshot.avgTokenUsagePercent}`);
+  if (snapshot.avgScopeGlobalSelected !== undefined) {
+    console.log(`  avgScopeGlobalSelected: ${snapshot.avgScopeGlobalSelected}`);
+  }
+  if (snapshot.avgScopeProjectSelected !== undefined) {
+    console.log(`  avgScopeProjectSelected: ${snapshot.avgScopeProjectSelected}`);
+  }
+  if (snapshot.avgProjectSelectionRatio !== undefined) {
+    console.log(`  avgProjectSelectionRatio: ${snapshot.avgProjectSelectionRatio}`);
+  }
 }
 
 function printReport(summary: SummaryPayload): void {
@@ -96,6 +120,19 @@ function printReport(summary: SummaryPayload): void {
   console.log(
     `  meetsP95EmbeddingsTarget: ${fmtBool(summary.targets.meetsP95EmbeddingsTarget)}`,
   );
+  if (summary.quotaImpact) {
+    console.log('quotaImpact:');
+    console.log(`  samples: ${summary.quotaImpact.samples}`);
+    console.log(`  avgSelectedBefore: ${summary.quotaImpact.avgSelectedBefore}`);
+    console.log(`  avgSelectedAfter: ${summary.quotaImpact.avgSelectedAfter}`);
+    console.log(`  avgTokensBefore: ${summary.quotaImpact.avgTokensBefore}`);
+    console.log(`  avgTokensAfter: ${summary.quotaImpact.avgTokensAfter}`);
+    console.log(`  avgTokenDelta: ${summary.quotaImpact.avgTokenDelta}`);
+    console.log(`  avgGlobalBefore: ${summary.quotaImpact.avgGlobalBefore}`);
+    console.log(`  avgGlobalAfter: ${summary.quotaImpact.avgGlobalAfter}`);
+    console.log(`  avgProjectBefore: ${summary.quotaImpact.avgProjectBefore}`);
+    console.log(`  avgProjectAfter: ${summary.quotaImpact.avgProjectAfter}`);
+  }
 }
 
 const summary = readLatestSummaryFromLog();

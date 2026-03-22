@@ -25,11 +25,37 @@ export interface CompressionConfig {
   excludedTiers: number[];
 }
 
+/**
+ * Adaptive quota configuration for memory injection scope allocation.
+ * Opt-in feature that adjusts global/project/flexible slots based on recent metrics.
+ */
+export interface AdaptiveQuotaConfig {
+  enabled: boolean;
+  globalMinRatio: number;
+  projectMinRatio: number;
+  flexibleRatio: number;
+  adjustmentStep: number;
+  minSamplesForAdjustment: number;
+  targetProjectRatio: number;
+  highTokenUsageThreshold: number;
+}
+
 export const DEFAULT_COMPRESSION_CONFIG: CompressionConfig = {
   enabled: false,
   maxCompressionRatio: 0.5,
   minSummaryLength: 50,
   excludedTiers: [0, 1],
+};
+
+export const DEFAULT_ADAPTIVE_QUOTA_CONFIG: AdaptiveQuotaConfig = {
+  enabled: false,
+  globalMinRatio: 0.3,
+  projectMinRatio: 0.3,
+  flexibleRatio: 0.4,
+  adjustmentStep: 0.05,
+  minSamplesForAdjustment: 20,
+  targetProjectRatio: 0.5,
+  highTokenUsageThreshold: 85,
 };
 
 /**
@@ -42,6 +68,7 @@ export interface TrueMemUserConfig {
   maxMemories: number;
   embeddingsEnabled: number;
   compression: CompressionConfig;
+  adaptiveQuota: AdaptiveQuotaConfig;
 }
 
 /**
@@ -63,6 +90,7 @@ export const DEFAULT_USER_CONFIG: TrueMemUserConfig = {
   maxMemories: 20,
   embeddingsEnabled: 0,
   compression: DEFAULT_COMPRESSION_CONFIG,
+  adaptiveQuota: DEFAULT_ADAPTIVE_QUOTA_CONFIG,
 };
 
 /**

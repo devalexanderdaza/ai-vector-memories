@@ -44,8 +44,8 @@ development_status:
   2-1-score-hibrido-configurable: done
   2-2-pruebas-de-reconsolidacion-por-tipo-de-decision: done
   epic-2-retrospective: optional
-  epic-3: backlog
-  3-1-compresion-opcional-de-contexto-inyectado: backlog
+  epic-3: in-progress
+  3-1-compresion-opcional-de-contexto-inyectado: ready-for-dev
   3-2-politica-de-cuotas-adaptable-por-metrias: backlog
   epic-3-retrospective: optional
   epic-4: backlog

@@ -562,6 +562,7 @@ export async function createTrueMemoryPlugin(
           injectionState,
           originalPrompt,
           10,
+          state.config.maxTokensForMemories,
         );
 
         if (memories.length > 0) {

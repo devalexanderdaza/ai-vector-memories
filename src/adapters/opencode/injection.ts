@@ -34,6 +34,64 @@ export type InjectionType = "user" | "project" | "global";
 
 type SelectionMode = "dynamic" | "fallback" | "none";
 
+const CLASSIFICATION_TIERS: Record<string, number> = {
+  constraint: 0,
+  preference: 1,
+  decision: 1,
+  learning: 2,
+  procedural: 2,
+  semantic: 3,
+  episodic: 3,
+};
+
+function getClassificationTier(classification: string): number {
+  return CLASSIFICATION_TIERS[classification] ?? 3;
+}
+
+function estimateMemoryTokens(memory: MemoryUnit): number {
+  const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
+  const storeLabel = memory.store === "ltm" ? "LTM" : "STM";
+  const xmlEnvelope = `<memory classification="${memory.classification}" store="${storeLabel}" strength="${memory.strength.toFixed(2)}"></memory>`;
+  return estimateTokens(memory.summary) + estimateTokens(xmlEnvelope) + 8;
+}
+
+function prioritizeByTier(memories: MemoryUnit[]): MemoryUnit[] {
+  return [...memories].sort((a, b) => {
+    const tierDiff =
+      getClassificationTier(a.classification) -
+      getClassificationTier(b.classification);
+    if (tierDiff !== 0) {
+      return tierDiff;
+    }
+    return b.strength - a.strength;
+  });
+}
+
+function applyTokenBudget(
+  memories: MemoryUnit[],
+  maxTokens: number,
+  maxMemories: number,
+): MemoryUnit[] {
+  const selected: MemoryUnit[] = [];
+  let totalTokens = 0;
+
+  for (const memory of memories) {
+    if (selected.length >= maxMemories) {
+      break;
+    }
+
+    const tokens = estimateMemoryTokens(memory);
+    if (totalTokens + tokens > maxTokens) {
+      continue;
+    }
+
+    selected.push(memory);
+    totalTokens += tokens;
+  }
+
+  return selected;
+}
+
 interface SelectionTelemetry {
   worktree: string;
   selected: number;
@@ -179,14 +237,21 @@ export async function getAtomicMemories(
   state: InjectionState,
   query?: string,
   limit: number = 8,
+  maxTokens: number = 4000,
 ): Promise<MemoryUnit[]> {
+  const candidateLimit = Math.max(limit * 4, limit);
+
+  let candidates: MemoryUnit[];
   if (query && query.trim().length > 0) {
     // Use Jaccard similarity search (text-based, no embeddings)
-    return state.db.vectorSearch(query, state.worktree, limit);
+    candidates = await state.db.vectorSearch(query, state.worktree, candidateLimit);
   } else {
     // Fall back to scope-based retrieval
-    return state.db.getMemoriesByScope(state.worktree, limit);
+    candidates = state.db.getMemoriesByScope(state.worktree, candidateLimit);
   }
+
+  const prioritized = prioritizeByTier(candidates);
+  return applyTokenBudget(prioritized, maxTokens, limit);
 }
 
 /**
@@ -264,14 +329,6 @@ export async function selectMemoriesForInjection(
   const globalMemories = allMemories.filter((m) => m.projectScope === null);
   const projectMemories = allMemories.filter((m) => m.projectScope !== null);
 
-  // Helper: Estimate tokens including XML envelope overhead (1 token ≈ 4 chars)
-  const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
-  const estimateMemoryTokens = (memory: MemoryUnit): number => {
-    const storeLabel = memory.store === "ltm" ? "LTM" : "STM";
-    const xmlEnvelope = `<memory classification="${memory.classification}" store="${storeLabel}" strength="${memory.strength.toFixed(2)}"></memory>`;
-    return estimateTokens(memory.summary) + estimateTokens(xmlEnvelope) + 8;
-  };
-
   // Helper: Add memory if within slots and token budget
   const addMemory = (memory: MemoryUnit): boolean => {
     if (selectedIds.has(memory.id)) {
@@ -308,22 +365,38 @@ export async function selectMemoriesForInjection(
   // Step 3: Scope quotas
   const globalHigh = globalMemories
     .filter((m) => !selectedIds.has(m.id))
-    .sort((a, b) => b.strength - a.strength)
+    .sort((a, b) => {
+      const tierDiff =
+        getClassificationTier(a.classification) -
+        getClassificationTier(b.classification);
+      if (tierDiff !== 0) {
+        return tierDiff;
+      }
+      return b.strength - a.strength;
+    })
     .slice(0, MIN_GLOBAL);
 
   for (const memory of globalHigh) {
     if (memories.length >= maxMemories) break;
-    if (!addMemory(memory)) break;
+    addMemory(memory);
   }
 
   const projectHigh = projectMemories
     .filter((m) => !selectedIds.has(m.id))
-    .sort((a, b) => b.strength - a.strength)
+    .sort((a, b) => {
+      const tierDiff =
+        getClassificationTier(a.classification) -
+        getClassificationTier(b.classification);
+      if (tierDiff !== 0) {
+        return tierDiff;
+      }
+      return b.strength - a.strength;
+    })
     .slice(0, MIN_PROJECT);
 
   for (const memory of projectHigh) {
     if (memories.length >= maxMemories) break;
-    if (!addMemory(memory)) break;
+    addMemory(memory);
   }
 
   // Step 4: Flexible slots
@@ -340,10 +413,15 @@ export async function selectMemoriesForInjection(
       worktree,
       MAX_FLEXIBLE,
     );
-    const newMemories = relevant.filter((m) => !selectedIds.has(m.id));
+    const newMemories = prioritizeByTier(
+      relevant.filter((m) => !selectedIds.has(m.id)),
+    );
 
     for (const memory of newMemories.slice(0, remainingSlots)) {
-      if (!addMemory(memory)) break;
+      if (memories.length >= maxMemories) {
+        break;
+      }
+      addMemory(memory);
     }
 
     log(
@@ -353,11 +431,22 @@ export async function selectMemoriesForInjection(
     selectionMode = "fallback";
     const remaining = allMemories
       .filter((m) => !selectedIds.has(m.id))
-      .sort((a, b) => b.strength - a.strength)
+      .sort((a, b) => {
+        const tierDiff =
+          getClassificationTier(a.classification) -
+          getClassificationTier(b.classification);
+        if (tierDiff !== 0) {
+          return tierDiff;
+        }
+        return b.strength - a.strength;
+      })
       .slice(0, remainingSlots);
 
     for (const memory of remaining) {
-      if (!addMemory(memory)) break;
+      if (memories.length >= maxMemories) {
+        break;
+      }
+      addMemory(memory);
     }
 
     log(

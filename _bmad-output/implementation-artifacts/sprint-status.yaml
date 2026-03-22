@@ -35,12 +35,12 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 development_status:
-  epic-1: backlog
-  1-1-unificar-decision-de-embeddings: backlog
-  1-2-presupuesto-estricto-de-tokens-en-seleccion: backlog
+  epic-1: done
+  1-1-unificar-decision-de-embeddings: done
+  1-2-presupuesto-estricto-de-tokens-en-seleccion: done
   1-3-trazabilidad-de-seleccion-de-memorias: done
   epic-1-retrospective: optional
-  epic-2: backlog
+  epic-2: done
   2-1-score-hibrido-configurable: done
   2-2-pruebas-de-reconsolidacion-por-tipo-de-decision: done
   epic-2-retrospective: optional
@@ -49,6 +49,6 @@ development_status:
   3-2-politica-de-cuotas-adaptable-por-metrias: backlog
   epic-3-retrospective: optional
   epic-4: backlog
-  4-1-suite-de-pruebas-de-integracion-para-retrieval-e-ineccion: ready-for-dev
+  4-1-suite-de-pruebas-de-integracion-para-retrieval-e-ineccion: done
   4-2-reporte-de-metrias-baseline-y-target: backlog
   epic-4-retrospective: optional

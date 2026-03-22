@@ -49,6 +49,7 @@ import {
 import { getVersion } from "../../utils/version.js";
 import { EmbeddingService } from "../../memory/embeddings-nlp.js";
 import { getEmbeddingsEnabled } from "../../config/state.js";
+import { InjectionMetricsCollector } from "../../memory/injection-metrics.js";
 import {
   markSessionCreated,
   hasInjected,
@@ -188,6 +189,28 @@ function estimateInjectionTokens(memories: MemoryUnit[]): number {
   }, 0);
 }
 
+interface InjectionTelemetry {
+  worktree: string;
+  sessionIdPrefix: string | null;
+  injectionMode: number;
+  embeddingsEnabled: boolean;
+  selectedMemories: number;
+  selectionLatencyMs: number;
+  limits: {
+    maxMemories: number;
+    maxTokens: number;
+  };
+  tokens: {
+    used: number;
+    percent: number;
+  };
+  scope: {
+    global: number;
+    project: number;
+  };
+  classifications: Record<string, number>;
+}
+
 function buildInjectionTelemetry(params: {
   memories: MemoryUnit[];
   worktree: string;
@@ -197,7 +220,7 @@ function buildInjectionTelemetry(params: {
   maxMemories: number;
   maxTokens: number;
   selectionLatencyMs: number;
-}): Record<string, unknown> {
+}): InjectionTelemetry {
   const classificationCounts: Record<string, number> = {};
   let globalCount = 0;
   let projectCount = 0;
@@ -301,6 +324,8 @@ interface TrueMemoryAdapterState {
   worktree: string;
   client: PluginInput["client"];
 }
+
+const injectionMetricsCollector = InjectionMetricsCollector.getInstance();
 
 /**
  * Create OpenCode plugin hooks
@@ -649,6 +674,20 @@ export async function createTrueMemoryPlugin(
           selectionLatencyMs,
         });
         log(`Injection telemetry: ${JSON.stringify(injectionTelemetry)}`);
+
+        try {
+          injectionMetricsCollector.record({
+            selectionLatencyMs,
+            selectedMemories: allMemories.length,
+            tokensUsed: injectionTelemetry.tokens.used,
+            tokenUsagePercent: injectionTelemetry.tokens.percent,
+            embeddingsEnabled,
+          });
+        } catch (metricsError) {
+          log(
+            `Injection metrics aggregation failed (non-blocking): ${metricsError}`,
+          );
+        }
 
         // Save to global state for "list memories" feature
         setLastInjectedMemories(allMemories);

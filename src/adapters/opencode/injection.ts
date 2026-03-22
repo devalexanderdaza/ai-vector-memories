@@ -3,19 +3,26 @@
  * XML-based memory injection with persona boundary support
  */
 
-import type { MemoryUnit } from '../../types.js';
-import type { MemoryDatabase } from '../../storage/database.js';
-import { jaccardSimilarity } from '../../memory/embeddings.js';
-import { USER_LEVEL_CLASSIFICATIONS } from '../../types.js';
-import { log } from '../../logger.js';
+import type { MemoryUnit } from "../../types.js";
+import type { MemoryDatabase } from "../../storage/database.js";
+import { jaccardSimilarity } from "../../memory/embeddings.js";
+import { USER_LEVEL_CLASSIFICATIONS } from "../../types.js";
+import { log } from "../../logger.js";
 
 /**
  * Adapter state interface for injection operations
  */
 export interface InjectionState {
   db: {
-    vectorSearch: (queryText: string, currentProject?: string, limit?: number) => Promise<MemoryUnit[]>;
-    getMemoriesByScope: (currentProject?: string, limit?: number) => MemoryUnit[];
+    vectorSearch: (
+      queryText: string,
+      currentProject?: string,
+      limit?: number,
+    ) => Promise<MemoryUnit[]>;
+    getMemoriesByScope: (
+      currentProject?: string,
+      limit?: number,
+    ) => MemoryUnit[];
   };
   worktree: string;
 }
@@ -23,7 +30,7 @@ export interface InjectionState {
 /**
  * Injection type determines the XML structure
  */
-export type InjectionType = 'user' | 'project' | 'global';
+export type InjectionType = "user" | "project" | "global";
 
 /**
  * Wrap memories in XML format with persona boundary
@@ -36,42 +43,50 @@ export type InjectionType = 'user' | 'project' | 'global';
 export function wrapMemories(
   memories: MemoryUnit[],
   worktree: string,
-  type: InjectionType = 'global'
+  type: InjectionType = "global",
 ): string {
   const lines: string[] = [
     `<true_memory_context type="${type}" worktree="${worktree}">`,
   ];
 
   // Add persona boundary to enforce user preferences
-  const userMemories = memories.filter(m => USER_LEVEL_CLASSIFICATIONS.includes(m.classification));
+  const userMemories = memories.filter((m) =>
+    USER_LEVEL_CLASSIFICATIONS.includes(m.classification),
+  );
   if (userMemories.length > 0) {
-    lines.push('  <persona_boundary>');
+    lines.push("  <persona_boundary>");
     for (const mem of userMemories) {
-      const storeLabel = mem.store === 'ltm' ? 'LTM' : 'STM';
-      lines.push(`    <memory classification="${mem.classification}" store="${storeLabel}" strength="${mem.strength.toFixed(2)}">`);
+      const storeLabel = mem.store === "ltm" ? "LTM" : "STM";
+      lines.push(
+        `    <memory classification="${mem.classification}" store="${storeLabel}" strength="${mem.strength.toFixed(2)}">`,
+      );
       lines.push(`      ${escapeXml(mem.summary)}`);
-      lines.push('    </memory>');
+      lines.push("    </memory>");
     }
-    lines.push('  </persona_boundary>');
-    lines.push('');
+    lines.push("  </persona_boundary>");
+    lines.push("");
   }
 
   // Add project-level memories
-  const projectMemories = memories.filter(m => !USER_LEVEL_CLASSIFICATIONS.includes(m.classification));
+  const projectMemories = memories.filter(
+    (m) => !USER_LEVEL_CLASSIFICATIONS.includes(m.classification),
+  );
   if (projectMemories.length > 0) {
-    lines.push('  <memories>');
+    lines.push("  <memories>");
     for (const mem of projectMemories) {
-      const storeLabel = mem.store === 'ltm' ? 'LTM' : 'STM';
-      lines.push(`    <memory classification="${mem.classification}" store="${storeLabel}" strength="${mem.strength.toFixed(2)}">`);
+      const storeLabel = mem.store === "ltm" ? "LTM" : "STM";
+      lines.push(
+        `    <memory classification="${mem.classification}" store="${storeLabel}" strength="${mem.strength.toFixed(2)}">`,
+      );
       lines.push(`      ${escapeXml(mem.summary)}`);
-      lines.push('    </memory>');
+      lines.push("    </memory>");
     }
-    lines.push('  </memories>');
+    lines.push("  </memories>");
   }
 
-  lines.push('</true_memory_context>');
+  lines.push("</true_memory_context>");
 
-  return lines.join('\n');
+  return lines.join("\n");
 }
 
 /**
@@ -85,7 +100,7 @@ export function wrapMemories(
 export async function getAtomicMemories(
   state: InjectionState,
   query?: string,
-  limit: number = 8
+  limit: number = 8,
 ): Promise<MemoryUnit[]> {
   if (query && query.trim().length > 0) {
     // Use Jaccard similarity search (text-based, no embeddings)
@@ -101,11 +116,11 @@ export async function getAtomicMemories(
  */
 function escapeXml(unsafe: string): string {
   return unsafe
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -115,8 +130,8 @@ function escapeXml(unsafe: string): string {
  * @returns Array of preference and constraint memories
  */
 export function extractUserPreferences(memories: MemoryUnit[]): MemoryUnit[] {
-  return memories.filter(m =>
-    USER_LEVEL_CLASSIFICATIONS.includes(m.classification)
+  return memories.filter((m) =>
+    USER_LEVEL_CLASSIFICATIONS.includes(m.classification),
   );
 }
 
@@ -127,19 +142,19 @@ export function extractUserPreferences(memories: MemoryUnit[]): MemoryUnit[] {
  * @returns Array of project-level memories
  */
 export function extractProjectContext(memories: MemoryUnit[]): MemoryUnit[] {
-  return memories.filter(m =>
-    !USER_LEVEL_CLASSIFICATIONS.includes(m.classification)
+  return memories.filter(
+    (m) => !USER_LEVEL_CLASSIFICATIONS.includes(m.classification),
   );
 }
 
 /**
  * Select memories for injection using dynamic allocation with scope quotas
- * 
+ *
  * Strategy (values scale proportionally to maxMemories):
  * - Min 30% GLOBAL (preferences, constraints, learning, procedural)
  * - Min 30% PROJECT (decisions, semantic, episodic)
  * - Max 40% flexible (context-relevant from either scope)
- * 
+ *
  * Classification Priority:
  * Tier 0: constraint (capped at 10, critical rules)
  * Tier 1: preference, decision (high priority, by strength)
@@ -152,98 +167,122 @@ export async function selectMemoriesForInjection(
   queryContext: string,
   embeddingsEnabled: boolean,
   maxMemories: number = 20,
-  maxTokens: number = 4000
+  maxTokens: number = 4000,
 ): Promise<MemoryUnit[]> {
   const memories: MemoryUnit[] = [];
+  const selectedIds = new Set<string>();
   let totalTokens = 0;
-  
+
   // Scale quotas proportionally
   const MIN_GLOBAL = Math.floor(maxMemories * 0.3);
   const MIN_PROJECT = Math.floor(maxMemories * 0.3);
   const MAX_FLEXIBLE = maxMemories - MIN_GLOBAL - MIN_PROJECT;
   const MAX_CONSTRAINTS = 10;
-  
+
   // Step 1: Get all memories
   const allMemories = db.getMemoriesByScope(worktree, 100);
-  
-  // Early return for small pools
-  if (allMemories.length <= maxMemories) {
-    log(`Small memory pool: returning all ${allMemories.length} memories`);
-    return allMemories;
-  }
-  
-  const globalMemories = allMemories.filter(m => m.projectScope === null);
-  const projectMemories = allMemories.filter(m => m.projectScope !== null);
-  
-  // Helper: Estimate tokens (1 token ≈ 4 chars)
+
+  const globalMemories = allMemories.filter((m) => m.projectScope === null);
+  const projectMemories = allMemories.filter((m) => m.projectScope !== null);
+
+  // Helper: Estimate tokens including XML envelope overhead (1 token ≈ 4 chars)
   const estimateTokens = (text: string): number => Math.ceil(text.length / 4);
-  
-  // Helper: Add memory if within budget
+  const estimateMemoryTokens = (memory: MemoryUnit): number => {
+    const storeLabel = memory.store === "ltm" ? "LTM" : "STM";
+    const xmlEnvelope = `<memory classification="${memory.classification}" store="${storeLabel}" strength="${memory.strength.toFixed(2)}"></memory>`;
+    return estimateTokens(memory.summary) + estimateTokens(xmlEnvelope) + 8;
+  };
+
+  // Helper: Add memory if within slots and token budget
   const addMemory = (memory: MemoryUnit): boolean => {
-    const tokens = estimateTokens(memory.summary);
+    if (selectedIds.has(memory.id)) {
+      return false;
+    }
+
+    if (memories.length >= maxMemories) {
+      return false;
+    }
+
+    const tokens = estimateMemoryTokens(memory);
     if (totalTokens + tokens > maxTokens) {
       log(`Token budget exceeded, skipping memory ${memory.id}`);
       return false;
     }
+
     memories.push(memory);
+    selectedIds.add(memory.id);
     totalTokens += tokens;
     return true;
   };
-  
+
   // Step 2: Tier 0 - Constraints (capped)
   const constraints = allMemories
-    .filter(m => m.classification === 'constraint')
+    .filter((m) => m.classification === "constraint")
     .sort((a, b) => b.strength - a.strength)
     .slice(0, MAX_CONSTRAINTS);
-  
+
   for (const constraint of constraints) {
+    if (memories.length >= maxMemories) break;
     if (!addMemory(constraint)) break;
   }
-  
+
   // Step 3: Scope quotas
   const globalHigh = globalMemories
-    .filter(m => !memories.find(existing => existing.id === m.id))
+    .filter((m) => !selectedIds.has(m.id))
     .sort((a, b) => b.strength - a.strength)
     .slice(0, MIN_GLOBAL);
-  
+
   for (const memory of globalHigh) {
+    if (memories.length >= maxMemories) break;
     if (!addMemory(memory)) break;
   }
-  
+
   const projectHigh = projectMemories
-    .filter(m => !memories.find(existing => existing.id === m.id))
+    .filter((m) => !selectedIds.has(m.id))
     .sort((a, b) => b.strength - a.strength)
     .slice(0, MIN_PROJECT);
-  
+
   for (const memory of projectHigh) {
+    if (memories.length >= maxMemories) break;
     if (!addMemory(memory)) break;
   }
-  
+
   // Step 4: Flexible slots
   const remainingSlots = maxMemories - memories.length;
-  
-  if (remainingSlots > 0 && embeddingsEnabled && queryContext.trim().length > 0) {
-    const relevant = await db.vectorSearch(queryContext, worktree, MAX_FLEXIBLE);
-    const existingIds = new Set(memories.map(m => m.id));
-    const newMemories = relevant.filter(m => !existingIds.has(m.id));
-    
+
+  if (
+    remainingSlots > 0 &&
+    embeddingsEnabled &&
+    queryContext.trim().length > 0
+  ) {
+    const relevant = await db.vectorSearch(
+      queryContext,
+      worktree,
+      MAX_FLEXIBLE,
+    );
+    const newMemories = relevant.filter((m) => !selectedIds.has(m.id));
+
     for (const memory of newMemories.slice(0, remainingSlots)) {
       if (!addMemory(memory)) break;
     }
-    
-    log(`Dynamic selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`);
+
+    log(
+      `Dynamic selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`,
+    );
   } else if (remainingSlots > 0) {
     const remaining = allMemories
-      .filter(m => !memories.find(existing => existing.id === m.id))
+      .filter((m) => !selectedIds.has(m.id))
       .sort((a, b) => b.strength - a.strength)
       .slice(0, remainingSlots);
-    
+
     for (const memory of remaining) {
       if (!addMemory(memory)) break;
     }
-    
-    log(`Fallback selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`);
+
+    log(
+      `Fallback selection: ${memories.length} memories [max=${maxMemories}, tokens=${totalTokens}]`,
+    );
   }
-  
+
   return memories;
 }

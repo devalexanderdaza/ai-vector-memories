@@ -164,7 +164,7 @@ function parseBooleanEnv(value: string | undefined, fallback: boolean): boolean 
 }
 
 function parseNumberEnv(value: string | undefined, fallback: number): number {
-  if (!value) return fallback;
+  if (!value || value.trim() === '') return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
@@ -180,17 +180,17 @@ function validateAdaptiveQuotaConfig(value: unknown): AdaptiveQuotaConfig {
     : DEFAULT_ADAPTIVE_QUOTA_CONFIG.enabled;
 
   const globalMinRatio = clampRatio(
-    typeof cfg.globalMinRatio === 'number'
+    typeof cfg.globalMinRatio === 'number' && Number.isFinite(cfg.globalMinRatio)
       ? cfg.globalMinRatio
       : DEFAULT_ADAPTIVE_QUOTA_CONFIG.globalMinRatio,
   );
   const projectMinRatio = clampRatio(
-    typeof cfg.projectMinRatio === 'number'
+    typeof cfg.projectMinRatio === 'number' && Number.isFinite(cfg.projectMinRatio)
       ? cfg.projectMinRatio
       : DEFAULT_ADAPTIVE_QUOTA_CONFIG.projectMinRatio,
   );
   const flexibleRatio = clampRatio(
-    typeof cfg.flexibleRatio === 'number'
+    typeof cfg.flexibleRatio === 'number' && Number.isFinite(cfg.flexibleRatio)
       ? cfg.flexibleRatio
       : DEFAULT_ADAPTIVE_QUOTA_CONFIG.flexibleRatio,
   );
@@ -201,7 +201,7 @@ function validateAdaptiveQuotaConfig(value: unknown): AdaptiveQuotaConfig {
     0,
     Math.min(
       0.2,
-      typeof cfg.adjustmentStep === 'number'
+      typeof cfg.adjustmentStep === 'number' && Number.isFinite(cfg.adjustmentStep)
         ? cfg.adjustmentStep
         : DEFAULT_ADAPTIVE_QUOTA_CONFIG.adjustmentStep,
     ),
@@ -209,13 +209,13 @@ function validateAdaptiveQuotaConfig(value: unknown): AdaptiveQuotaConfig {
   const minSamplesForAdjustment = Math.max(
     1,
     Math.floor(
-      typeof cfg.minSamplesForAdjustment === 'number'
+      typeof cfg.minSamplesForAdjustment === 'number' && Number.isFinite(cfg.minSamplesForAdjustment)
         ? cfg.minSamplesForAdjustment
         : DEFAULT_ADAPTIVE_QUOTA_CONFIG.minSamplesForAdjustment,
     ),
   );
   const targetProjectRatio = clampRatio(
-    typeof cfg.targetProjectRatio === 'number'
+    typeof cfg.targetProjectRatio === 'number' && Number.isFinite(cfg.targetProjectRatio)
       ? cfg.targetProjectRatio
       : DEFAULT_ADAPTIVE_QUOTA_CONFIG.targetProjectRatio,
   );
@@ -223,7 +223,7 @@ function validateAdaptiveQuotaConfig(value: unknown): AdaptiveQuotaConfig {
     0,
     Math.min(
       100,
-      typeof cfg.highTokenUsageThreshold === 'number'
+      typeof cfg.highTokenUsageThreshold === 'number' && Number.isFinite(cfg.highTokenUsageThreshold)
         ? cfg.highTokenUsageThreshold
         : DEFAULT_ADAPTIVE_QUOTA_CONFIG.highTokenUsageThreshold,
     ),

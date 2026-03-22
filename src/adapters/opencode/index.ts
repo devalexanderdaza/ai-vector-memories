@@ -655,6 +655,9 @@ export async function createTrueMemoryPlugin(
 
         const selectionStart = Date.now();
 
+        let compressionTokensSaved = 0;
+        let compressionEvents = 0;
+
         // Use smart selection instead of getMemoriesByScope
         const allMemories = await selectMemoriesForInjection(
           state.db,
@@ -663,6 +666,10 @@ export async function createTrueMemoryPlugin(
           embeddingsEnabled,
           state.config.maxMemories,
           state.config.maxTokensForMemories,
+          (tokens: number) => {
+            compressionEvents = 1;
+            compressionTokensSaved = tokens;
+          }
         );
         const selectionLatencyMs = Date.now() - selectionStart;
 
@@ -688,8 +695,8 @@ export async function createTrueMemoryPlugin(
             tokensUsed: injectionTelemetry.tokens.used,
             tokenUsagePercent: injectionTelemetry.tokens.percent,
             embeddingsEnabled,
-            compressionEvents: 0,
-            tokensSavedByCompression: 0,
+            compressionEvents,
+            tokensSavedByCompression: compressionTokensSaved,
             scopeGlobalSelected,
             scopeProjectSelected,
           });

@@ -5,7 +5,12 @@
  * to compare progress over time.
  */
 
+import { join } from 'path';
+import { homedir } from 'os';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { log } from "../logger.js";
+
+const STATE_FILE = join(homedir(), '.ai-vector-memories', 'metrics-state.json');
 
 export interface InjectionMetricsRecord {
   selectionLatencyMs: number;
@@ -104,12 +109,14 @@ function snapshotFrom(records: InjectionMetricsRecord[]): MetricsSnapshot {
   const tokenPercents = records.map((record) => record.tokenUsagePercent);
   const compressionEvents = records.map((record) => record.compressionEvents);
   const tokensSaved = records.map((record) => record.tokensSavedByCompression);
-  const scopeGlobalSelected = records.map((record) => record.scopeGlobalSelected);
-  const scopeProjectSelected = records.map((record) => record.scopeProjectSelected);
+  const scopeGlobalSelected = records.map((record) => record.scopeGlobalSelected ?? 0);
+  const scopeProjectSelected = records.map((record) => record.scopeProjectSelected ?? 0);
   const projectRatios = records.map((record) => {
-    const total = record.scopeGlobalSelected + record.scopeProjectSelected;
+    const global = record.scopeGlobalSelected ?? 0;
+    const project = record.scopeProjectSelected ?? 0;
+    const total = global + project;
     if (total <= 0) return 0;
-    return record.scopeProjectSelected / total;
+    return project / total;
   });
 
   return {
@@ -165,13 +172,52 @@ export class InjectionMetricsCollector {
   private baseline: MetricsSnapshot | null = null;
   private totalInjections = 0;
 
-  private constructor() {}
+  private constructor() {
+    this.hydrate();
+  }
 
   static getInstance(): InjectionMetricsCollector {
     if (!InjectionMetricsCollector.instance) {
       InjectionMetricsCollector.instance = new InjectionMetricsCollector();
     }
     return InjectionMetricsCollector.instance;
+  }
+
+  private hydrate(): void {
+    try {
+      if (existsSync(STATE_FILE)) {
+        const data = readFileSync(STATE_FILE, 'utf-8');
+        const state = JSON.parse(data);
+        if (Array.isArray(state.records)) {
+          this.records = state.records;
+        }
+        if (Array.isArray(state.quotaImpactRecords)) {
+          this.quotaImpactRecords = state.quotaImpactRecords;
+        }
+        if (state.baseline) {
+          this.baseline = state.baseline;
+        }
+        if (typeof state.totalInjections === 'number') {
+          this.totalInjections = state.totalInjections;
+        }
+      }
+    } catch (err) {
+      log(`Failed to hydrate injection metrics state: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  private persist(): void {
+    try {
+      const state = {
+        records: this.records,
+        quotaImpactRecords: this.quotaImpactRecords,
+        baseline: this.baseline,
+        totalInjections: this.totalInjections,
+      };
+      writeFileSync(STATE_FILE, JSON.stringify(state));
+    } catch (err) {
+      log(`Failed to persist injection metrics state: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   record(record: InjectionMetricsRecord): void {
@@ -207,6 +253,8 @@ export class InjectionMetricsCollector {
       const summary = this.getSummary();
       log(`Injection metrics summary: ${JSON.stringify(summary)}`);
     }
+
+    this.persist();
   }
 
   recordQuotaImpact(record: QuotaImpactRecord): void {
@@ -214,6 +262,7 @@ export class InjectionMetricsCollector {
     if (this.quotaImpactRecords.length > MAX_WINDOW_SIZE) {
       this.quotaImpactRecords.shift();
     }
+    this.persist();
   }
 
   private buildQuotaImpactSummary(): QuotaImpactSummary | null {
@@ -245,13 +294,7 @@ export class InjectionMetricsCollector {
     };
   }
 
-  recordCompression(tokensSaved: number): void {
-    const latest = this.records[this.records.length - 1];
-    if (latest) {
-      latest.compressionEvents += 1;
-      latest.tokensSavedByCompression += tokensSaved;
-    }
-  }
+
 
   getSummary(): SummaryPayload {
     const current = snapshotFrom(this.records);

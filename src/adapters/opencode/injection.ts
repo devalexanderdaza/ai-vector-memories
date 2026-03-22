@@ -12,6 +12,7 @@ import { applyCompression } from "../../memory/compression.js";
 import { getCompressionConfig, getAdaptiveQuotaConfig } from "../../config/config.js";
 import { InjectionMetricsCollector } from "../../memory/injection-metrics.js";
 import type { AdaptiveQuotaConfig } from "../../types/config.js";
+import { DEFAULT_ADAPTIVE_QUOTA_CONFIG } from "../../types/config.js";
 
 /**
  * Adapter state interface for injection operations
@@ -136,11 +137,11 @@ function normalizeQuotaRatios(config: AdaptiveQuotaConfig): {
   const flexibleRatio = Math.max(0, Math.min(1, config.flexibleRatio));
   const sum = globalMinRatio + projectMinRatio + flexibleRatio;
 
-  if (sum <= 0) {
+  if (sum <= 0 || Number.isNaN(sum)) {
     return {
-      globalMinRatio: 0.3,
-      projectMinRatio: 0.3,
-      flexibleRatio: 0.4,
+      globalMinRatio: DEFAULT_ADAPTIVE_QUOTA_CONFIG.globalMinRatio,
+      projectMinRatio: DEFAULT_ADAPTIVE_QUOTA_CONFIG.projectMinRatio,
+      flexibleRatio: DEFAULT_ADAPTIVE_QUOTA_CONFIG.flexibleRatio,
     };
   }
 
@@ -424,6 +425,7 @@ export async function selectMemoriesForInjection(
    embeddingsEnabled: boolean,
    maxMemories: number = 20,
    maxTokens: number = 4000,
+   onCompression?: (tokensSaved: number) => void,
  ): Promise<MemoryUnit[]> {
    const startTime = Date.now();
    const memories: MemoryUnit[] = [];
@@ -432,16 +434,11 @@ export async function selectMemoriesForInjection(
    let selectionMode: SelectionMode = "none";
 
    const adaptiveQuotaConfig = getAdaptiveQuotaConfig();
-   const staticQuota = computeQuotaSlots(maxMemories, {
-     ...adaptiveQuotaConfig,
-     globalMinRatio: 0.3,
-     projectMinRatio: 0.3,
-     flexibleRatio: 0.4,
-   });
    const baseQuota = computeQuotaSlots(maxMemories, adaptiveQuotaConfig);
+   const staticQuota = computeQuotaSlots(maxMemories, DEFAULT_ADAPTIVE_QUOTA_CONFIG);
    const effectiveQuota = adaptiveQuotaConfig.enabled
      ? adjustQuotaSlotsWithMetrics(baseQuota, adaptiveQuotaConfig)
-     : staticQuota;
+     : baseQuota;
 
    const MIN_GLOBAL = effectiveQuota.minGlobal;
    const MIN_PROJECT = effectiveQuota.minProject;
@@ -544,9 +541,9 @@ export async function selectMemoriesForInjection(
     queryContext.trim().length > 0
   ) {
     selectionMode = "dynamic";
-    const relevant = await db.vectorSearch(queryContext, worktree, Math.max(MAX_FLEXIBLE, remainingSlots));
+    const relevant = await db.vectorSearch(queryContext, worktree, Math.max(MAX_FLEXIBLE, remainingSlots) * 2);
     const newMemories = prioritizeByTier(
-      relevant.filter((m) => !selectedIds.has(m.id) && (m.projectScope === null || m.projectScope === worktree)),
+      relevant.filter((m) => !selectedIds.has(m.id) && (m.projectScope == null || m.projectScope === worktree)),
     );
 
     for (const memory of newMemories.slice(0, remainingSlots)) {
@@ -600,10 +597,8 @@ export async function selectMemoriesForInjection(
         memories.length = 0;
         memories.push(...compressedMemories);
         log(`Compression applied: saved ${tokensSaved} tokens, final ${memories.length} memories`);
-        try {
-          InjectionMetricsCollector.getInstance().recordCompression(tokensSaved);
-        } catch (metricsErr) {
-          log(`Compression metrics failed: ${metricsErr instanceof Error ? metricsErr.message : String(metricsErr)}`);
+        if (onCompression) {
+          onCompression(tokensSaved);
         }
       }
     } catch (err) {
@@ -614,7 +609,10 @@ export async function selectMemoriesForInjection(
   const selectedScopeGlobal = memories.filter((memory) => memory.projectScope == null).length;
   const selectedScopeProject = memories.filter((memory) => memory.projectScope === worktree).length;
   const estimatedAvgTokensPerMemory = memories.length > 0 ? Math.round(totalTokens / memories.length) : 0;
-  const baselineSelectedCount = Math.min(maxMemories, baselineScopeGlobal + baselineScopeProject + staticQuota.maxFlexible);
+  
+  // Baseline considers what WOULD be selected without adaptive ratios, capped by available memories
+  const baselineMaxFlexible = Math.min(scopedMemories.length - baselineScopeGlobal - baselineScopeProject, staticQuota.maxFlexible);
+  const baselineSelectedCount = Math.min(maxMemories, baselineScopeGlobal + baselineScopeProject + Math.max(0, baselineMaxFlexible));
   const estimatedBaselineTokens = baselineSelectedCount * estimatedAvgTokensPerMemory;
 
   try {

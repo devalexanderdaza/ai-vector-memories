@@ -1,5 +1,5 @@
 # generated: 2026-03-22
-# last_updated: 2026-03-22T11:35:00Z
+# last_updated: 2026-03-22T12:02:51Z
 # project: ai-vector-memories
 # project_key: NOKEY
 # tracking_system: file-system
@@ -48,7 +48,7 @@ development_status:
   3-1-compresion-opcional-de-contexto-inyectado: done
   3-2-politica-de-cuotas-adaptable-por-metrias: done
   epic-3-retrospective: optional
-  epic-4: in-progress
+  epic-4: done
   4-1-suite-de-pruebas-de-integracion-para-retrieval-e-ineccion: done
-  4-2-reporte-de-metrias-baseline-y-target: review
-  epic-4-retrospective: optional
+  4-2-reporte-de-metrias-baseline-y-target: done
+  epic-4-retrospective: done

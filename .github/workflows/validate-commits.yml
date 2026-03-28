@@ -1,0 +1,42 @@
+name: Validate Commits
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install commitlint
+        run: npm install -g commitlint @commitlint/config-conventional
+
+      - name: Validate commit messages
+        run: |
+          commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
+
+      - name: Comment on PR if validation fails
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '❌ Commit messages do not follow [Conventional Commits](https://www.conventionalcommits.org/) format.\n\n**Valid format:** `<type>(<scope>): <subject>`\n\n**Types:** feat, fix, docs, style, refactor, perf, test, chore, ci, revert\n\n**Examples:**\n- `feat(auth): add oauth2 support`\n- `fix: resolve memory leak in cache`\n- `docs: update installation guide`'
+            })

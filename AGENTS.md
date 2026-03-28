@@ -30,10 +30,40 @@ There are currently no `*.test.ts` / `*.spec.ts` files. If/when tests exist, use
 - No linter/formatter is configured (no ESLint/Prettier/Biome configs).
 - **Rule:** Keep edits consistent with existing style and rely heavily on `bun run typecheck`.
 
+## Release & Versioning (semantic-release)
+
+**Automated Release Flow:**
+1. Developer creates commits with [Conventional Commits](https://www.conventionalcommits.org/) format
+2. Push to `main` branch triggers GitHub Action
+3. `semantic-release` analyzes commits and automatically:
+   - Calculates next version (major/minor/patch)
+   - Updates `package.json` and `CHANGELOG.md`
+   - Builds with `bun run build`
+   - Publishes to npm
+   - Creates git tag and GitHub release
+
+**Commit Format:**
+- `feat: description` → **MINOR** version bump (e.g., 0.0.1 → 0.1.0)
+- `fix: description` → **PATCH** version bump (e.g., 0.1.0 → 0.1.1)
+- `feat!: description` or `BREAKING CHANGE:` in body → **MAJOR** version bump (e.g., 0.1.0 → 1.0.0)
+- `docs:`, `style:`, `chore:`, `test:`, `refactor:` → No version change
+
+**Local Validation:**
+- `commit-msg` hook validates message format (installed via husky)
+- Run: `bun run commit-lint` to manually validate
+
+**Monorepo Support:**
+- Currently single-package; `semantic-release` is sufficient
+- If multi-package needed in future, migrate to `changesets`
+
+**Credentials Required:**
+- `NPM_TOKEN`: Deploy to npm (existing)
+- `GH_TOKEN`: Allow semantic-release to push tags and create releases (new, needed in GitHub secrets)
+
 ## Repository-Specific Rules & Context
 
 - **Cursor / Copilot:** No `.cursor/rules/`, `.cursorrules`, or `.github/copilot-instructions.md` exist.
-- **CI / Release:** Pushes to `main` with `package.json` changes trigger a GitHub Action to publish to npm.
+- **CI / Release:** Pushes to `main` trigger semantic-release to calculate version, update changelog, tag, create GitHub release, and publish to npm.
 
 ## Project Method & References
 

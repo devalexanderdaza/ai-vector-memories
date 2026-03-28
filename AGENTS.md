@@ -49,7 +49,7 @@ There are currently no `*.test.ts` / `*.spec.ts` files. If/when tests exist, use
 - `docs:`, `style:`, `chore:`, `test:`, `refactor:` → No version change
 
 **Local Validation:**
-- Pre-commit hook validates message format (installed via husky)
+- `commit-msg` hook validates message format (installed via husky)
 - Run: `bun run commit-lint` to manually validate
 
 **Monorepo Support:**
@@ -63,7 +63,7 @@ There are currently no `*.test.ts` / `*.spec.ts` files. If/when tests exist, use
 ## Repository-Specific Rules & Context
 
 - **Cursor / Copilot:** No `.cursor/rules/`, `.cursorrules`, or `.github/copilot-instructions.md` exist.
-- **CI / Release:** Pushes to `main` with `package.json` changes trigger a GitHub Action to publish to npm.
+- **CI / Release:** Pushes to `main` trigger semantic-release to calculate version, update changelog, tag, create GitHub release, and publish to npm.
 
 ## Project Method & References
 

@@ -112,7 +112,7 @@ to JSON format. See migration guide in docs/migration-v1.md
 
 ## Commit Validation
 
-### Local (Pre-commit)
+### Local (commit-msg hook)
 
 When you commit, a **husky** hook automatically validates your message:
 
@@ -177,7 +177,7 @@ The `.github/workflows/validate-commits.yml` workflow validates all commits in a
 
 ### Q: What if my commit doesn't match the format?
 
-**A:** The pre-commit hook will reject it immediately:
+**A:** The commit-msg hook will reject it immediately:
 
 ```bash
 $ git commit -m "fixed stuff"

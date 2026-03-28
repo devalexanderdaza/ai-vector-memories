@@ -4,6 +4,10 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
 
+permissions:
+  contents: read
+  issues: write
+
 jobs:
   commitlint:
     runs-on: ubuntu-latest
@@ -23,7 +27,7 @@ jobs:
 
       - name: Validate commit messages
         run: |
-          commitlint --from ${{ github.event.pull_request.base.sha }} --to HEAD
+          commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}
 
       - name: Comment on PR if validation fails
         if: failure()

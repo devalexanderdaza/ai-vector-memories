@@ -1,6 +1,6 @@
 {
   "name": "ai-vector-memories",
-  "version": "0.0.0-development",
+  "version": "1.0.0",
   "description": "AI Vector Memories is an open-source library that provides a powerful and efficient way to manage and utilize vector-based memories for AI applications. It offers a simple API for storing, retrieving, and manipulating high-dimensional vector representations of data, enabling developers to build intelligent systems that can learn from and reason about complex information.",
   "authors": [
     {
